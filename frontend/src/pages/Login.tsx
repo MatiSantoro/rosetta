@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { isAuthenticated, signInWithGoogle, onAuthEvent } from '../lib/auth'
 import ThemeToggle from '../components/ThemeToggle'
 import HieroglyphRain from '../components/HieroglyphRain'
+import Footer from '../components/Footer'
 
 const EXAMPLES = [
   { from: 'Terraform',      to: 'CloudFormation'   },
@@ -168,6 +169,8 @@ export default function Login() {
           3 free translations per day · No credit card required
         </p>
       </div>
+
+      <Footer />
     </div>
   )
 }

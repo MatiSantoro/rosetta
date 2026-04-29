@@ -49,3 +49,4 @@ tests/results/
 frontend/public/rosetta-logo-preview.png
 frontend/public/rosetta_logo_stone.png
 infra/bootstrap/terraform.tfstate
+client_secret_*.json
