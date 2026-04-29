@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Sample CloudFormation stack — S3 bucket, DynamoDB table, IAM role, Lambda function.
+  Used to test CloudFormation → Terraform translation in Rosetta.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+Resources:
+
+  # ── Storage ──────────────────────────────────────────────────────────────
+
+  DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "sample-data-${Environment}-${AWS::AccountId}"
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  JobsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "jobs-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: jobId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: jobId
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  # ── IAM ──────────────────────────────────────────────────────────────────
+
+  ProcessorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "processor-role-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DataAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: DynamoDB
+                Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                Resource: !GetAtt JobsTable.Arn
+              - Sid: S3
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub "${DataBucket.Arn}/*"
+
+  # ── Compute ───────────────────────────────────────────────────────────────
+
+  ProcessorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "processor-${Environment}"
+      Runtime: python3.13
+      Handler: handler.handler
+      Role: !GetAtt ProcessorRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Architectures: [arm64]
+      Environment:
+        Variables:
+          JOBS_TABLE: !Ref JobsTable
+          DATA_BUCKET: !Ref DataBucket
+          ENVIRONMENT: !Ref Environment
+
+  ProcessorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/processor-${Environment}"
+      RetentionInDays: 30
+
+Outputs:
+  BucketName:
+    Value: !Ref DataBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-BucketName"
+
+  TableName:
+    Value: !Ref JobsTable
+    Export:
+      Name: !Sub "${AWS::StackName}-TableName"
+
+  FunctionArn:
+    Value: !GetAtt ProcessorFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-FunctionArn"

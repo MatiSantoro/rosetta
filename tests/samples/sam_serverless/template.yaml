@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Fully serverless Orders API — Lambda + API Gateway + DynamoDB.
+  All resources are serverless-compatible (valid SAM → other format target).
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Architectures: [arm64]
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+        ORDERS_TABLE: !Ref OrdersTable
+
+Resources:
+
+  # ── Data ─────────────────────────────────────────────────────────────────
+
+  OrdersTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: !Sub "orders-${Environment}"
+      PrimaryKey:
+        Name: orderId
+        Type: String
+      SSESpecification:
+        SSEEnabled: true
+
+  # ── Functions ─────────────────────────────────────────────────────────────
+
+  CreateOrderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "create-order-${Environment}"
+      Handler: create_order.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OrdersTable
+      Events:
+        HttpPost:
+          Type: HttpApi
+          Properties:
+            Path: /orders
+            Method: POST
+            ApiId: !Ref OrdersApi
+
+  GetOrderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "get-order-${Environment}"
+      Handler: get_order.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref OrdersTable
+      Events:
+        HttpGet:
+          Type: HttpApi
+          Properties:
+            Path: /orders/{orderId}
+            Method: GET
+            ApiId: !Ref OrdersApi
+
+  ListOrdersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "list-orders-${Environment}"
+      Handler: list_orders.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref OrdersTable
+      Events:
+        HttpGet:
+          Type: HttpApi
+          Properties:
+            Path: /orders
+            Method: GET
+            ApiId: !Ref OrdersApi
+
+  # ── API ───────────────────────────────────────────────────────────────────
+
+  OrdersApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Environment
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Authorization
+          - Content-Type
+
+Outputs:
+  ApiUrl:
+    Description: Base URL of the Orders HTTP API.
+    Value: !Sub "https://${OrdersApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+
+  TableName:
+    Value: !Ref OrdersTable

@@ -1,0 +1,21 @@
+# Copy to terraform.tfvars and fill in.
+
+project = "rosetta"
+env     = "dev"
+region  = "us-east-1"
+
+# Google OAuth 2.0 client (Web application). Create one in Google Cloud Console.
+# The client secret should be stored separately in SSM (see README.md).
+google_client_id               = "REPLACE_WITH_YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+google_client_secret_ssm_param = "/rosetta/dev/google_oauth_client_secret"
+
+# After Amplify Hosting is created (later), add its URL here too.
+frontend_callback_urls = [
+  "http://localhost:5173/auth/callback",
+]
+frontend_logout_urls = [
+  "http://localhost:5173/",
+]
+
+artifacts_retention_days = 7
+daily_job_quota_per_user = 3

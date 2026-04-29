@@ -1,0 +1,226 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design tokens ──────────────────────────────────────────────────────── */
+
+:root {
+  /* Light mode — warm stone */
+  --bg:           #F7F3ED;
+  --bg-subtle:    #EDE8DF;
+  --surface:      #FFFFFF;
+  --surface-2:    #F2EDE6;
+  --border:       #DDD5C8;
+  --border-focus: #C97E2A;
+  --text:         #1C1714;
+  --text-muted:   #7A6E65;
+  --text-faint:   #A89E94;
+  --accent:       #C97E2A;
+  --accent-hover: #B56E1F;
+  --accent-fg:    #FFFFFF;
+  --accent-glow:  rgba(201, 126, 42, 0.25);
+  --accent-subtle:rgba(201, 126, 42, 0.08);
+
+  --status-running:  #2563EB;
+  --status-done:     #16A34A;
+  --status-failed:   #DC2626;
+  --status-warning:  #D97706;
+  --status-waiting:  #6B7280;
+
+  --radius:    6px;
+  --radius-lg: 12px;
+  --shadow:    0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.08);
+}
+
+.dark {
+  /* Dark mode — deep charcoal with warm undertones */
+  --bg:           #100E0C;
+  --bg-subtle:    #171310;
+  --surface:      #1D1916;
+  --surface-2:    #241F1B;
+  --border:       #2E2722;
+  --border-focus: #D4892F;
+  --text:         #EDE8DF;
+  --text-muted:   #8B7E74;
+  --text-faint:   #5C524A;
+  --accent:       #D4892F;
+  --accent-hover: #E09640;
+  --accent-fg:    #100E0C;
+  --accent-glow:  rgba(212, 137, 47, 0.30);
+  --accent-subtle:rgba(212, 137, 47, 0.10);
+
+  --shadow:    0 1px 3px rgba(0,0,0,0.30), 0 1px 2px rgba(0,0,0,0.20);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.40), 0 2px 4px rgba(0,0,0,0.25);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,0.50), 0 8px 24px rgba(0,0,0,0.35);
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────── */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Subtle grain texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.4;
+}
+
+/* ── Typography ─────────────────────────────────────────────────────────── */
+
+.font-display { font-family: 'Syne', sans-serif; }
+.font-mono    { font-family: 'JetBrains Mono', monospace; }
+
+/* ── Components ─────────────────────────────────────────────────────────── */
+
+/* Button base */
+.btn {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded text-sm font-medium
+         transition-all duration-150 cursor-pointer select-none border;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+  @apply hover:opacity-90 active:scale-95;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+  @apply hover:border-[var(--accent)] hover:text-[var(--accent)] active:scale-95;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: transparent;
+  @apply hover:text-[var(--text)] hover:bg-[var(--accent-subtle)] active:scale-95;
+}
+
+/* Card */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+/* Input */
+.input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: 'Outfit', sans-serif;
+}
+
+.input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* Badge */
+.badge {
+  @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.02em;
+}
+
+/* Shimmer loading animation */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-subtle) 0%,
+    var(--surface-2) 50%,
+    var(--bg-subtle) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s linear infinite;
+}
+
+/* Accent glow on active states */
+.glow {
+  box-shadow: 0 0 20px var(--accent-glow), 0 0 40px var(--accent-glow);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+
+/* ── Animations ─────────────────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes exampleIn {
+  0%   { opacity: 0; transform: translateY(5px); }
+  100% { opacity: 1; transform: translateY(0);   }
+}
+
+@keyframes exampleOut {
+  0%   { opacity: 1; transform: translateY(0);    }
+  100% { opacity: 0; transform: translateY(-5px); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.5; box-shadow: 0 0 10px var(--accent-glow); }
+  50%       { opacity: 1;   box-shadow: 0 0 24px var(--accent-glow); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-in  { animation: fadeIn 0.35s ease-out both; }
+.animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.20s; }
+.stagger-5 { animation-delay: 0.25s; }
