@@ -11,3 +11,13 @@ cors_origins           = ["https://rosetta-translate.com"]
 
 artifacts_retention_days = 7
 daily_job_quota_per_user = 3
+
+# Bedrock model IDs — use inference profiles (us.*) for cross-region availability
+translate_model_id = "us.anthropic.claude-sonnet-4-6"
+opus_model_id      = "us.anthropic.claude-opus-4-6-v1"
+compat_model_id    = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+
+# Observability
+alert_email        = "rosetta.translate.app@gmail.com"
+monthly_budget_usd = 200
+bedrock_budget_usd = 100
