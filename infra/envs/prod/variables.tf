@@ -62,3 +62,21 @@ variable "compat_model_id" {
   type    = string
   default = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 }
+
+# ------- Observability -------
+
+variable "alert_email" {
+  description = "Email for CloudWatch alarms and budget notifications."
+  type        = string
+  default     = "rosetta.translate.app@gmail.com"
+}
+
+variable "monthly_budget_usd" {
+  type    = number
+  default = 200
+}
+
+variable "bedrock_budget_usd" {
+  type    = number
+  default = 100
+}

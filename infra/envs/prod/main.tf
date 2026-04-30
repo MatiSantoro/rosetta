@@ -61,3 +61,22 @@ module "api" {
   lambda_arns        = module.lambda.function_arns
   cors_allow_origins = var.cors_origins
 }
+
+module "observability" {
+  source = "../../modules/observability"
+
+  name_prefix        = local.name_prefix
+  alert_email        = var.alert_email
+  state_machine_arn  = module.state_machine.state_machine_arn
+  state_machine_name = module.state_machine.state_machine_name
+  api_id             = module.api.api_id
+  jobs_table_name    = module.storage.jobs_table_name
+  monthly_budget_usd = var.monthly_budget_usd
+  bedrock_budget_usd = var.bedrock_budget_usd
+
+  lambda_function_names = [
+    for k in ["preflight", "compatibility_check", "dependency_map",
+              "translate", "validate", "package", "mark_failed"] :
+    "${local.name_prefix}-sfn-${k}"
+  ]
+}
