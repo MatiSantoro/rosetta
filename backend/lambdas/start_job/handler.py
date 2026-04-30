@@ -45,6 +45,9 @@ def handler(event, context):
             "inputS3Key": job["inputS3Key"],
             "artifactsBucket": ARTIFACTS_BUCKET,
             "retryCount": 0,
+            "useOpus": False,
+            # validateResult initialised so IncrementRetry Pass states can read it safely
+            "validateResult": {"ok": True, "errors": [], "warnings": []},
         }),
     )
 

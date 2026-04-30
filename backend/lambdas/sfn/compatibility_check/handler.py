@@ -73,7 +73,7 @@ def handler(event, context):
         modelId=COMPAT_MODEL_ID,
         system=[{"text": SYSTEM_PROMPT}],
         messages=[{"role": "user", "content": [{"text": user_msg}]}],
-        inferenceConfig={"maxTokens": 256, "temperature": 0.0},
+        inferenceConfig={"maxTokens": 256},
     )
 
     raw = response["output"]["message"]["content"][0]["text"].strip()

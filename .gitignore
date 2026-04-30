@@ -51,4 +51,4 @@ rosetta-prod_accessKeys.csv
 tests/results/
 frontend/public/rosetta-logo-preview.png
 frontend/public/rosetta_logo_stone.png
-infra/bootstrap/terraform.tfstate
+infra/bootstrap/terraform.tfstatebackend/layers/terraform-bin/bin/
