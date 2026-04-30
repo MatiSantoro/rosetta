@@ -51,6 +51,42 @@ resource "aws_lambda_layer_version" "shared" {
 }
 
 # ---------------------------------------------------------------------------
+# cfn-lint Python layer (for CloudFormation/SAM validation)
+# ---------------------------------------------------------------------------
+
+data "archive_file" "python_deps_layer" {
+  type        = "zip"
+  source_dir  = "${path.root}/../../../backend/layers/python-deps"
+  output_path = "${path.module}/dist/python_deps_layer.zip"
+}
+
+resource "aws_lambda_layer_version" "python_deps" {
+  filename                 = data.archive_file.python_deps_layer.output_path
+  layer_name               = "${var.name_prefix}-python-deps"
+  compatible_runtimes      = ["python3.13"]
+  compatible_architectures = ["arm64"]
+  source_code_hash         = data.archive_file.python_deps_layer.output_base64sha256
+}
+
+# ---------------------------------------------------------------------------
+# Terraform binary layer (for HCL syntax validation)
+# ---------------------------------------------------------------------------
+
+data "archive_file" "terraform_bin_layer" {
+  type        = "zip"
+  source_dir  = "${path.root}/../../../backend/layers/terraform-bin"
+  output_path = "${path.module}/dist/terraform_bin_layer.zip"
+}
+
+resource "aws_lambda_layer_version" "terraform_bin" {
+  filename                 = data.archive_file.terraform_bin_layer.output_path
+  layer_name               = "${var.name_prefix}-terraform-bin"
+  compatible_runtimes      = ["python3.13"]
+  compatible_architectures = ["arm64"]
+  source_code_hash         = data.archive_file.terraform_bin_layer.output_base64sha256
+}
+
+# ---------------------------------------------------------------------------
 # Lambda archives
 # ---------------------------------------------------------------------------
 
@@ -157,7 +193,12 @@ resource "aws_lambda_function" "workers" {
   runtime          = "python3.13"
   architectures    = ["arm64"]
   role             = aws_iam_role.worker.arn
-  layers           = [aws_lambda_layer_version.shared.arn]
+  # validate gets cfn-lint + terraform binary layers; others just need shared utilities
+  layers = each.key == "validate" ? [
+    aws_lambda_layer_version.shared.arn,
+    aws_lambda_layer_version.python_deps.arn,
+    aws_lambda_layer_version.terraform_bin.arn,
+  ] : [aws_lambda_layer_version.shared.arn]
   timeout          = lookup(local.worker_timeouts, each.key, 60)
   memory_size      = 512
 

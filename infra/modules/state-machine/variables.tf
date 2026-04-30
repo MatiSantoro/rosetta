@@ -31,7 +31,7 @@ variable "translate_model_id" {
 variable "opus_model_id" {
   description = "Bedrock model ID for translation escalation on 3rd retry (Claude Opus 4.7)."
   type        = string
-  default     = "us.anthropic.claude-opus-4-7"
+  default     = "us.anthropic.claude-opus-4-6-v1"
 }
 
 variable "compat_model_id" {

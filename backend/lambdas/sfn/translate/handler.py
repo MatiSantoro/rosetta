@@ -222,7 +222,7 @@ def handler(event, context):
         modelId=model_id,
         system=[{"text": system_prompt}],
         messages=[{"role": "user", "content": [{"text": user_msg}]}],
-        inferenceConfig={"maxTokens": 8192, "temperature": 0.0},
+        inferenceConfig={"maxTokens": 8192},
     )
 
     translated = response["output"]["message"]["content"][0]["text"].strip()
