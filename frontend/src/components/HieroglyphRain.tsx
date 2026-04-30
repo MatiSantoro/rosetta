@@ -61,13 +61,20 @@ export default function HieroglyphRain() {
     window.addEventListener('resize', init)
 
     function draw() {
-      ctx.fillStyle = 'rgb(12, 10, 8)'
+      // Read current theme from CSS variables so dark/light switch works live
+      const style   = getComputedStyle(document.documentElement)
+      const bg      = style.getPropertyValue('--bg').trim()      || '#100E0C'
+      const isDark  = document.documentElement.classList.contains('dark')
+
+      ctx.fillStyle = bg
       ctx.fillRect(0, 0, el.width, el.height)
 
       ctx.font = '20px serif'
 
       for (const col of columns) {
-        ctx.fillStyle = `rgba(228, 162, 56, ${col.opacity})`
+        // Glyphs need higher opacity in light mode to remain visible
+        const opacity = isDark ? col.opacity : col.opacity * 2.5
+        ctx.fillStyle = `rgba(201, 126, 42, ${opacity})`
         ctx.fillText(col.glyph, col.x, col.y)
 
         col.y     += col.speed
