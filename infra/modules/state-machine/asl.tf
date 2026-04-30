@@ -109,7 +109,8 @@ locals {
           "artifactsBucket.$" = "$.artifactsBucket"
           "depGraph.$"        = "$.depGraph"
           "retryCount.$"      = "$.retryCount"
-          useOpus             = false
+          "useOpus.$"         = "$.useOpus"
+          "validateResult.$"  = "$.validateResult"
         }
         Iterator = {
           StartAt = "TranslateFile"
@@ -139,8 +140,7 @@ locals {
         Next           = "ValidationDecision"
       }
 
-      # ── Route: validation result → package or package-with-warnings ───────
-      # Retry loop with Bedrock escalation will be added when wiring real calls.
+      # ── Route: ok → Package, errors + retries left → retry, else warnings ───
       ValidationDecision = {
         Type = "Choice"
         Choices = [
@@ -148,9 +148,63 @@ locals {
             Variable      = "$.validateResult.ok"
             BooleanEquals = true
             Next          = "Package"
+          },
+          {
+            And = [
+              { Variable = "$.validateResult.ok"  BooleanEquals = false },
+              { Variable = "$.retryCount"         NumericLessThan = 2   }
+            ]
+            Next = "IncrementRetry"
+          },
+          {
+            And = [
+              { Variable = "$.validateResult.ok"  BooleanEquals = false },
+              { Variable = "$.retryCount"         NumericEquals = 2     }
+            ]
+            Next = "IncrementRetryOpus"
           }
         ]
         Default = "PackageWithWarnings"
+      }
+
+      # ── Retry: increment counter, feed errors back, re-translate ─────────
+      IncrementRetry = {
+        Type = "Pass"
+        Parameters = {
+          "userId.$"           = "$.userId"
+          "jobId.$"            = "$.jobId"
+          "sourceLang.$"       = "$.sourceLang"
+          "sourceCdkLang.$"    = "$.sourceCdkLang"
+          "targetLang.$"       = "$.targetLang"
+          "targetCdkLang.$"    = "$.targetCdkLang"
+          "artifactsBucket.$"  = "$.artifactsBucket"
+          "preflightResult.$"  = "$.preflightResult"
+          "depGraph.$"         = "$.depGraph"
+          "validateResult.$"   = "$.validateResult"
+          "retryCount.$"       = "States.MathAdd($.retryCount, 1)"
+          useOpus              = false
+        }
+        Next = "TranslateFiles"
+      }
+
+      # ── Final retry: escalate to Opus 4.7 ────────────────────────────────
+      IncrementRetryOpus = {
+        Type = "Pass"
+        Parameters = {
+          "userId.$"           = "$.userId"
+          "jobId.$"            = "$.jobId"
+          "sourceLang.$"       = "$.sourceLang"
+          "sourceCdkLang.$"    = "$.sourceCdkLang"
+          "targetLang.$"       = "$.targetLang"
+          "targetCdkLang.$"    = "$.targetCdkLang"
+          "artifactsBucket.$"  = "$.artifactsBucket"
+          "preflightResult.$"  = "$.preflightResult"
+          "depGraph.$"         = "$.depGraph"
+          "validateResult.$"   = "$.validateResult"
+          "retryCount.$"       = "States.MathAdd($.retryCount, 1)"
+          useOpus              = true
+        }
+        Next = "TranslateFiles"
       }
 
       # ── 6a. Zip output and mark COMPLETED ────────────────────────────────
