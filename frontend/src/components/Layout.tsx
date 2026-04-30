@@ -155,7 +155,7 @@ export default function Layout() {
   // Shares the same query key as Dashboard — no duplicate network calls when both are mounted.
   const { data: jobsData, isLoading: jobsLoading } = useQuery({
     queryKey:       ['jobs'],
-    queryFn:        listJobs,
+    queryFn:        () => listJobs(),
     staleTime:      30_000,   // reuse cached data for 30 s
     refetchInterval: 60_000,  // then refresh every minute
   })

@@ -31,7 +31,9 @@ export default function HieroglyphRain() {
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext('2d')!
+    // 'el' is typed as HTMLCanvasElement (narrowed) — safe to use inside nested functions
+    const el  = canvas as HTMLCanvasElement
+    const ctx = el.getContext('2d')!
 
     const COL_W = 36
     let columns: Column[] = []
@@ -41,13 +43,13 @@ export default function HieroglyphRain() {
     function pick() { return GLYPHS[Math.floor(Math.random() * GLYPHS.length)] }
 
     function init() {
-      canvas.width  = window.innerWidth
-      canvas.height = window.innerHeight
-      const n = Math.ceil(canvas.width / COL_W) + 1
+      el.width  = window.innerWidth
+      el.height = window.innerHeight
+      const n = Math.ceil(el.width / COL_W) + 1
 
       columns = Array.from({ length: n }, (_, i) => ({
         x:       i * COL_W + 8,
-        y:       rnd(-canvas.height, canvas.height),
+        y:       rnd(-el.height, el.height),
         speed:   rnd(0.4, 1.0),
         opacity: rnd(0.06, 0.14),
         timer:   0,
@@ -59,9 +61,8 @@ export default function HieroglyphRain() {
     window.addEventListener('resize', init)
 
     function draw() {
-      // Draw background color on canvas so outer divs can be transparent
       ctx.fillStyle = 'rgb(12, 10, 8)'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.fillRect(0, 0, el.width, el.height)
 
       ctx.font = '20px serif'
 
@@ -72,14 +73,12 @@ export default function HieroglyphRain() {
         col.y     += col.speed
         col.timer += 1
 
-        // Change glyph slowly
         if (col.timer > rnd(30, 60)) {
           col.glyph = pick()
           col.timer = 0
         }
 
-        // Reset when off-screen
-        if (col.y > canvas.height + 30) {
+        if (col.y > el.height + 30) {
           col.y       = -30
           col.speed   = rnd(0.4, 1.0)
           col.opacity = rnd(0.06, 0.14)
