@@ -58,6 +58,24 @@ variable "cors_origins" {
   default     = ["http://localhost:5173"]
 }
 
+# ------- Observability -------
+
+variable "alert_email" {
+  description = "Email address for CloudWatch alarms and budget notifications."
+  type        = string
+  default     = "matisantoro10@gmail.com"
+}
+
+variable "monthly_budget_usd" {
+  type    = number
+  default = 50
+}
+
+variable "bedrock_budget_usd" {
+  type    = number
+  default = 20
+}
+
 # ------- Limits -------
 
 variable "daily_job_quota_per_user" {

@@ -42,3 +42,13 @@ output "state_machine_arn" {
   description = "Step Functions state machine ARN."
   value       = module.state_machine.state_machine_arn
 }
+
+output "dashboard_url" {
+  description = "CloudWatch dashboard URL."
+  value       = module.observability.dashboard_url
+}
+
+output "alerts_sns_arn" {
+  description = "SNS topic ARN for alerts."
+  value       = module.observability.sns_topic_arn
+}

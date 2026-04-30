@@ -29,3 +29,11 @@ output "jobs_table" {
 output "state_machine_arn" {
   value = module.state_machine.state_machine_arn
 }
+
+output "dashboard_url" {
+  value = module.observability.dashboard_url
+}
+
+output "alerts_sns_arn" {
+  value = module.observability.sns_topic_arn
+}
