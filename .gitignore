@@ -43,10 +43,11 @@ infra/modules/*/dist/
 .env.*
 !.env.example
 *.pem
+client_secret_*.json
+rosetta-prod_credentials.csv
 
 # Test results and temp logo files
 tests/results/
 frontend/public/rosetta-logo-preview.png
 frontend/public/rosetta_logo_stone.png
 infra/bootstrap/terraform.tfstate
-client_secret_*.json
