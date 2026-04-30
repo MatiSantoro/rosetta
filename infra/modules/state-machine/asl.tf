@@ -151,15 +151,15 @@ locals {
           },
           {
             And = [
-              { Variable = "$.validateResult.ok"  BooleanEquals = false },
-              { Variable = "$.retryCount"         NumericLessThan = 2   }
+              { Variable = "$.validateResult.ok", BooleanEquals = false },
+              { Variable = "$.retryCount",        NumericLessThan = 2   }
             ]
             Next = "IncrementRetry"
           },
           {
             And = [
-              { Variable = "$.validateResult.ok"  BooleanEquals = false },
-              { Variable = "$.retryCount"         NumericEquals = 2     }
+              { Variable = "$.validateResult.ok", BooleanEquals = false },
+              { Variable = "$.retryCount",        NumericEquals = 2     }
             ]
             Next = "IncrementRetryOpus"
           }
