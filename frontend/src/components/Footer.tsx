@@ -113,6 +113,11 @@ export default function Footer({ minimal = false }: FooterProps) {
           <span>© {new Date().getFullYear()} Matías Santoro</span>
           <span>·</span>
           <span>Built with Claude AI & AWS Bedrock</span>
+          <span>·</span>
+          <a href="/legal" style={{ color: 'var(--text-faint)' }}
+             className="hover:text-[var(--accent)] transition-colors">
+            Terms & Privacy
+          </a>
         </div>
 
       </div>
