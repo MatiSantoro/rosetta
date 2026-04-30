@@ -19,8 +19,13 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={() => setDark(d => !d)}
-      className="btn btn-ghost w-8 h-8 p-0 rounded-lg"
+      className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-150 active:scale-95"
       aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      style={{
+        border:     '1px solid var(--border)',
+        background: 'var(--surface)',
+        color:      'var(--text-muted)',
+      }}
     >
       {dark
         ? <Sun  size={15} style={{ color: 'var(--accent)' }} />
