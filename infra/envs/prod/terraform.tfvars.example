@@ -1,0 +1,13 @@
+project = "rosetta"
+env     = "prod"
+region  = "us-east-1"
+
+google_client_id               = "REPLACE_WITH_PROD_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+google_client_secret_ssm_param = "/rosetta/prod/google_oauth_client_secret"
+
+frontend_callback_urls = ["https://rosetta-translate.com/auth/callback"]
+frontend_logout_urls   = ["https://rosetta-translate.com/"]
+cors_origins           = ["https://rosetta-translate.com"]
+
+artifacts_retention_days = 7
+daily_job_quota_per_user = 3

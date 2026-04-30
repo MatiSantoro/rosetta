@@ -45,6 +45,7 @@ infra/modules/*/dist/
 *.pem
 client_secret_*.json
 rosetta-prod_credentials.csv
+rosetta-prod_accessKeys.csv
 
 # Test results and temp logo files
 tests/results/
