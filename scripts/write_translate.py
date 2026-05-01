@@ -1,4 +1,10 @@
-"""
+"""One-time script to write the new TranslateUnit handler."""
+import os
+
+path = os.path.join(os.path.dirname(__file__), "..",
+                    "backend", "lambdas", "sfn", "translate", "handler.py")
+
+content = r'''"""
 TranslateUnit Lambda - translate ONE unit (directory/module/stack) to the target language.
 Accepts all source files for the unit, returns multiple output files as JSON.
 """
@@ -178,3 +184,8 @@ def handler(event, context):
         "tokensIn":    tokens_in,
         "tokensOut":   tokens_out,
     }
+'''
+
+with open(path, "w", encoding="utf-8") as f:
+    f.write(content)
+print("Written OK, lines:", len(content.splitlines()))

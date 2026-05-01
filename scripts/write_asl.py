@@ -1,4 +1,10 @@
-locals {
+"""Write the new unit-aware ASL definition."""
+import os
+
+path = os.path.join(os.path.dirname(__file__), "..",
+                    "infra", "modules", "state-machine", "asl.tf")
+
+content = """locals {
   lambda_retry = [
     {
       ErrorEquals     = ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.TooManyRequestsException", "Lambda.SdkClientException"]
@@ -241,3 +247,8 @@ locals {
     }
   })
 }
+"""
+
+with open(path, "w", encoding="utf-8") as f:
+    f.write(content)
+print("ASL written OK, lines:", len(content.splitlines()))

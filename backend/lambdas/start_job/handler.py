@@ -48,6 +48,7 @@ def handler(event, context):
             "useOpus": False,
             # validateResult initialised so IncrementRetry Pass states can read it safely
             "validateResult": {"ok": True, "errors": [], "warnings": []},
+            "planResult": {"units": [], "symbolTable": {}, "planNotes": ""},
         }),
     )
 

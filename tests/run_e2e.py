@@ -64,6 +64,46 @@ TESTS = [
         "source_lang": "sam",
         "target_lang": "cloudformation",
     },
+    {
+        "name":        "Terraform modules (12 files, 4 dirs) → CloudFormation",
+        "sample_dir":  "samples/tf_modules",
+        "source_lang": "terraform",
+        "target_lang": "cloudformation",
+    },
+    {
+        "name":        "CloudFormation → CDK (TypeScript)",
+        "sample_dir":  "samples/cfn_to_terraform",
+        "source_lang": "cloudformation",
+        "target_lang": "cdk",
+        "target_cdk_lang": "typescript",
+    },
+    {
+        "name":        "Terraform → CDK (Python)",
+        "sample_dir":  "samples/terraform_to_cfn",
+        "source_lang": "terraform",
+        "target_lang": "cdk",
+        "target_cdk_lang": "python",
+    },
+    {
+        "name":        "SAM → Terraform",
+        "sample_dir":  "samples/sam_serverless",
+        "source_lang": "sam",
+        "target_lang": "terraform",
+    },
+    {
+        "name":        "CDK (TypeScript) → CloudFormation",
+        "sample_dir":  "samples/cdk_to_cfn",
+        "source_lang": "cdk",
+        "source_cdk_lang": "typescript",
+        "target_lang": "cloudformation",
+    },
+    {
+        "name":        "Terraform modules → CDK (TypeScript)",
+        "sample_dir":  "samples/tf_modules",
+        "source_lang": "terraform",
+        "target_lang": "cdk",
+        "target_cdk_lang": "typescript",
+    },
 ]
 
 POLL_INTERVAL_S  = 4
