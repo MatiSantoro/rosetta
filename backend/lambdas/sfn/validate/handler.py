@@ -38,15 +38,31 @@ def handler(event, context):
     cdk    = event.get("targetCdkLang")
     key    = f"cdk_{cdk}" if target == "cdk" and cdk else target
     bucket = event["artifactsBucket"]
-    results = event.get("translateResults") or []
-    if not results:
+    raw_results = event.get("translateResults") or []
+    if not raw_results:
         return {"ok": True, "errors": [], "warnings": []}
+
+    # translateResults is now a list of unit results, each with outputFiles list.
+    # Flatten to a single list of {path, outKey} records for the validators.
+    flat_results = []
+    for item in raw_results:
+        if isinstance(item, dict):
+            if "outputFiles" in item:
+                # New unit-based format
+                flat_results.extend(item["outputFiles"])
+            elif "outKey" in item:
+                # Legacy single-file format (backwards compat)
+                flat_results.append(item)
+
+    if not flat_results:
+        return {"ok": True, "errors": [], "warnings": []}
+
     if target in ("cloudformation", "sam"):
-        return validate_cfn(bucket, results)
+        return validate_cfn(bucket, flat_results)
     elif target == "terraform":
-        return validate_terraform(bucket, results)
+        return validate_terraform(bucket, flat_results)
     else:
-        return validate_bedrock(bucket, results, key)
+        return validate_bedrock(bucket, flat_results, key)
 
 def _download(bucket, res):
     out_key = res.get("outKey")

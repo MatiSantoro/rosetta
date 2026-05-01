@@ -10,12 +10,14 @@ locals {
     "validate",
     "package",
     "mark_failed",
+    "plan_translation",
   ])
 
   # Per-function timeout overrides; all others default to 60 s
   worker_timeouts = {
     preflight           = 180
     dependency_map      = 300
+    plan_translation    = 120
     translate           = 180
     validate            = 300
     package             = 180
