@@ -365,11 +365,7 @@ export default function NewJob() {
   return (
     <div className="max-w-2xl mx-auto animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => step > 0 ? setStep(s => s - 1) : navigate('/')}
-                className="btn btn-ghost w-8 h-8 p-0 rounded-lg">
-          <ArrowLeft size={15} />
-        </button>
+      <div className="mb-6">
         <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--text)' }}>
           New translation
         </h1>
@@ -382,9 +378,18 @@ export default function NewJob() {
       {step === 1 && renderFormat()}
       {step === 2 && renderConfirm()}
 
-      {/* Navigation */}
+      {/* Navigation — Back and Continue always visible together */}
       {step < 2 && (
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex items-center justify-between">
+          <button
+            onClick={() => step > 0 ? setStep(s => s - 1) : navigate('/')}
+            className="btn btn-ghost px-4 flex items-center gap-2 text-sm"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <ArrowLeft size={14} />
+            {step === 0 ? 'Cancel' : 'Back'}
+          </button>
+
           <button
             onClick={() => setStep(s => s + 1)}
             disabled={!canGoNext}
@@ -393,6 +398,22 @@ export default function NewJob() {
           >
             Continue
             <ArrowRight size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Back button on confirm step */}
+      {step === 2 && !mutation.isPending && (
+        <div className="mt-3 flex justify-center">
+          <button
+            onClick={() => setStep(1)}
+            className="text-xs flex items-center gap-1.5 transition-colors"
+            style={{ color: 'var(--text-faint)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}
+          >
+            <ArrowLeft size={11} />
+            Change formats
           </button>
         </div>
       )}

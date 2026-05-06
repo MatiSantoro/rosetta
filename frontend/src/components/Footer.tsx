@@ -37,7 +37,7 @@ export default function Footer({ minimal = false }: FooterProps) {
   if (minimal) {
     return (
       <footer
-        className="flex items-center justify-between px-6 py-3 border-t text-xs flex-wrap gap-3"
+        className="mt-10 flex items-center justify-between px-6 py-3 border-t text-xs flex-wrap gap-3"
         style={{ borderColor: 'var(--border)', color: 'var(--text-faint)' }}
       >
         <span>© {new Date().getFullYear()} Matías Santoro</span>
