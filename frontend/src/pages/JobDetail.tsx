@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Download, AlertCircle, CheckCircle, ArrowRight, Copy, Check } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getJob, getDownloadUrl, type Job, type LangKey } from '../lib/api'
 import StatusBadge from '../components/StatusBadge'
 
@@ -15,12 +15,12 @@ const LANG_LABELS: Record<LangKey, string> = {
 }
 
 const PIPELINE_STEPS = [
-  { key: 'PREFLIGHT',   label: 'Preflight',    desc: 'Extracting & classifying files' },
-  { key: 'COMPAT_CHECK',label: 'Compatibility', desc: 'Checking SAM serverless rules' },
-  { key: 'DEP_MAP',     label: 'Analysis',     desc: 'Building dependency graph' },
-  { key: 'TRANSLATE',   label: 'Translation',  desc: 'Calling Claude Sonnet' },
-  { key: 'VALIDATE',    label: 'Validation',   desc: 'Linting output files' },
-  { key: 'DONE',        label: 'Done',         desc: 'Packaging results' },
+  { key: 'PREFLIGHT',    label: 'Preflight',     desc: 'Extracting & classifying files'  },
+  { key: 'COMPAT_CHECK', label: 'Compatibility', desc: 'Checking SAM serverless rules'   },
+  { key: 'PLAN',         label: 'Analysis',      desc: 'Building translation plan'       },
+  { key: 'TRANSLATE',    label: 'Translation',   desc: 'Calling Claude Sonnet'           },
+  { key: 'VALIDATE',     label: 'Validation',    desc: 'Linting output files'            },
+  { key: 'DONE',         label: 'Done',          desc: 'Packaging results'               },
 ]
 
 // ── Helper ──────────────────────────────────────────────────────────────────
@@ -59,28 +59,71 @@ function isTerminal(status: Job['status']) {
 // ── Pipeline visualization ──────────────────────────────────────────────────
 
 function PipelineSteps({ job }: { job: Job }) {
-  const current = stepIndex(job.step)
-  const failed  = job.status === 'FAILED'
+  const terminal = isTerminal(job.status)
+  const failed   = job.status === 'FAILED'
+  const allDone  = job.status === 'COMPLETED' || job.status === 'COMPLETED_WITH_WARNINGS'
+
+  // The real step index from the server — our ground truth.
+  const serverIdx = allDone
+    ? PIPELINE_STEPS.length  // every step complete
+    : failed
+      ? stepIndex(job.step)
+      : stepIndex(job.step)
+
+  // displayIdx: the step we're currently SHOWING in the UI.
+  // It only ever moves forward — never backwards.
+  // When the server jumps several steps at once (e.g. polling missed
+  // COMPAT_CHECK and PLAN), we animate through each missed step at 350ms
+  // intervals so the user sees them light up one by one.
+  const [displayIdx, setDisplayIdx] = useState(Math.max(serverIdx, -1))
+  const animRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    // Clear any running animation before starting a new one
+    if (animRef.current) clearInterval(animRef.current)
+
+    if (serverIdx <= displayIdx) return  // never go backwards
+
+    // Animate through each missed step
+    let next = displayIdx + 1
+    animRef.current = setInterval(() => {
+      setDisplayIdx(next)
+      next++
+      if (next > serverIdx) {
+        clearInterval(animRef.current!)
+        animRef.current = null
+      }
+    }, 350)
+
+    return () => {
+      if (animRef.current) clearInterval(animRef.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverIdx])
 
   return (
     <div className="space-y-1">
       {PIPELINE_STEPS.map((s, i) => {
-        const done    = i < current || job.status === 'COMPLETED' || job.status === 'COMPLETED_WITH_WARNINGS'
-        const active  = i === current && !isTerminal(job.status)
-        const errored = failed && i === current
+        const done    = allDone || i < displayIdx
+        const active  = i === displayIdx && !terminal
+        const errored = failed && i === displayIdx
 
         return (
-          <div key={s.key} className="flex items-center gap-3 py-2 px-3 rounded-lg transition-all duration-300"
-               style={{ background: active ? 'var(--accent-subtle)' : errored ? '#DC262610' : 'transparent' }}>
-
+          <div
+            key={s.key}
+            className="flex items-center gap-3 py-2 px-3 rounded-lg transition-all duration-300"
+            style={{ background: active ? 'var(--accent-subtle)' : errored ? '#DC262610' : 'transparent' }}
+          >
             {/* Icon */}
-            <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-500"
-                 style={{
-                   background: done    ? 'var(--accent)' :
-                               active  ? 'var(--accent)' :
-                               errored ? '#DC2626'       : 'var(--bg-subtle)',
-                   boxShadow: active ? '0 0 12px var(--accent-glow)' : 'none',
-                 }}>
+            <div
+              className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-500"
+              style={{
+                background: done    ? 'var(--accent)'  :
+                            active  ? 'var(--accent)'  :
+                            errored ? '#DC2626'        : 'var(--bg-subtle)',
+                boxShadow: active ? '0 0 12px var(--accent-glow)' : 'none',
+              }}
+            >
               {done ? (
                 <Check size={11} color="var(--accent-fg)" />
               ) : errored ? (
@@ -95,8 +138,10 @@ function PipelineSteps({ job }: { job: Job }) {
 
             {/* Text */}
             <div className="flex-1 min-w-0">
-              <span className="text-sm font-medium"
-                    style={{ color: done || active ? 'var(--text)' : 'var(--text-faint)' }}>
+              <span
+                className="text-sm font-medium transition-colors duration-300"
+                style={{ color: done || active ? 'var(--text)' : 'var(--text-faint)' }}
+              >
                 {s.label}
               </span>
               {active && (
@@ -105,11 +150,6 @@ function PipelineSteps({ job }: { job: Job }) {
                 </span>
               )}
             </div>
-
-            {/* Connector line */}
-            {i < PIPELINE_STEPS.length - 1 && (
-              <div className="absolute" /> // visual handled by spacing
-            )}
           </div>
         )
       })}
