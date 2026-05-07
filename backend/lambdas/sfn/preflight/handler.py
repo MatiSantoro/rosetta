@@ -64,6 +64,77 @@ def should_skip_path(path: str) -> bool:
     return any(frag in p for frag in SKIP_PATH_FRAGMENTS)
 
 
+# ── Source language detection ─────────────────────────────────────────────────
+
+_LANG_LABELS = {
+    "terraform":      "Terraform (.tf)",
+    "cloudformation": "CloudFormation (YAML/JSON)",
+    "sam":            "SAM (YAML/JSON)",
+    "cdk":            "CDK (TypeScript/Python/Java/C#/Go)",
+}
+
+
+def detect_source_language(iac_files: list, file_summaries: dict) -> str | None:
+    """
+    Infer the most likely source language from file extensions and content.
+    Returns one of: 'terraform', 'cloudformation', 'sam', 'cdk', or None (uncertain).
+    """
+    ext_counts: dict[str, int] = {}
+    for f in iac_files:
+        ext_counts[f["ext"]] = ext_counts.get(f["ext"], 0) + 1
+        # cdk.json is a definitive CDK signal
+        if os.path.basename(f["path"]) == "cdk.json":
+            return "cdk"
+
+    # .tf files → Terraform (most unambiguous signal)
+    if ext_counts.get(".tf", 0) > 0:
+        return "terraform"
+
+    # YAML/JSON → inspect content for SAM vs CloudFormation
+    yaml_json_exts = {".yaml", ".yml", ".json"}
+    yaml_files = [f for f in iac_files if f["ext"] in yaml_json_exts]
+    sam_hits, cfn_hits = 0, 0
+    for f in yaml_files:
+        content = file_summaries.get(f["path"], "")
+        if "AWS::Serverless" in content or ("Transform" in content and "Serverless" in content):
+            sam_hits += 1
+        elif "AWSTemplateFormatVersion" in content or ("Resources" in content and "Type: AWS::" in content):
+            cfn_hits += 1
+    if sam_hits > 0:
+        return "sam"
+    if cfn_hits > 0:
+        return "cloudformation"
+
+    # Code-only files → CDK
+    cdk_exts = {".ts", ".py", ".java", ".cs", ".go"}
+    if any(ext_counts.get(e, 0) > 0 for e in cdk_exts):
+        # Only declare CDK if there are no YAML/JSON files that look like raw templates
+        if not yaml_files:
+            return "cdk"
+
+    return None  # uncertain — don't block
+
+
+def validate_source_language(declared: str, detected: str | None) -> None:
+    """
+    Raise a ValueError if the detected language clearly doesn't match
+    what the user declared. Passes through when detection is uncertain (None).
+    """
+    if detected is None or detected == declared:
+        return
+
+    # CDK is declared but files look like Terraform/CFN/SAM → mismatch
+    # Terraform is declared but files look like SAM → mismatch
+    # etc.
+    detected_label  = _LANG_LABELS.get(detected,  detected)
+    declared_label  = _LANG_LABELS.get(declared,  declared)
+    raise ValueError(
+        f"LANGUAGE_MISMATCH: The uploaded files look like {detected_label}, "
+        f"but you selected {declared_label} as the source language. "
+        f"Please start a new translation with the correct source format."
+    )
+
+
 def handler(event, context):
     update_job_step(ddb, JOBS_TABLE, event["userId"], event["jobId"], "PREFLIGHT")
 
@@ -159,6 +230,12 @@ def handler(event, context):
 
     if not iac_files:
         raise ValueError("No valid IaC files found in the archive")
+
+    # Detect the actual source language and fail fast if it clearly doesn't
+    # match what the user declared — before any Bedrock calls are made.
+    declared_lang = event.get("sourceLang", "")
+    detected_lang = detect_source_language(iac_files, file_summaries)
+    validate_source_language(declared_lang, detected_lang)
 
     # Persist skipped list to DDB for user visibility
     if skipped:

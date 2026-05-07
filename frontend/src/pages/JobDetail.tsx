@@ -35,6 +35,13 @@ function friendlyError(raw?: string): string {
   if (!raw) return 'An unexpected error occurred. Please try again.'
 
   const r = raw.toLowerCase()
+  if (r.includes('language_mismatch') || r.includes('look like') && r.includes('but you selected')) {
+    // Extract the detected/declared labels from the raw message if possible
+    const match = raw?.match(/look like (.+?), but you selected (.+?)\. Please/)
+    if (match)
+      return `The uploaded files look like ${match[1]}, but you selected ${match[2]} as the source language. Please start a new translation and choose the correct source format.`
+    return 'The source language you selected does not match the files in your zip. Please start a new translation and choose the correct source format.'
+  }
   if (r.includes('no valid iac files'))
     return 'No supported IaC files were found in your zip. Make sure it contains .tf, .yaml, .json, .ts, .py, .java, .cs, or .go files.'
   if (r.includes('quota') || r.includes('429') || r.includes('limit'))
