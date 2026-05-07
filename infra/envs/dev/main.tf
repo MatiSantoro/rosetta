@@ -26,12 +26,14 @@ module "auth" {
 module "state_machine" {
   source = "../../modules/state-machine"
 
-  name_prefix           = local.name_prefix
-  jobs_table_name       = module.storage.jobs_table_name
-  jobs_table_arn        = module.storage.jobs_table_arn
-  artifacts_bucket_name = module.storage.artifacts_bucket_name
-  artifacts_bucket_arn  = module.storage.artifacts_bucket_arn
-  kms_key_arn           = module.storage.kms_key_arn
+  name_prefix            = local.name_prefix
+  jobs_table_name        = module.storage.jobs_table_name
+  jobs_table_arn         = module.storage.jobs_table_arn
+  usage_quota_table_name = module.storage.usage_quota_table_name
+  usage_quota_table_arn  = module.storage.usage_quota_table_arn
+  artifacts_bucket_name  = module.storage.artifacts_bucket_name
+  artifacts_bucket_arn   = module.storage.artifacts_bucket_arn
+  kms_key_arn            = module.storage.kms_key_arn
 }
 
 module "lambda" {

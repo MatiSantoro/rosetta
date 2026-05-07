@@ -1,5 +1,6 @@
 provider "aws" {
-  region = var.region
+  region  = var.region
+  profile = "rosetta-prod"   # same account (454634138593) as prod, isolated by name_prefix
 
   default_tags {
     tags = {
