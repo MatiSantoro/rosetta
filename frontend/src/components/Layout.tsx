@@ -93,9 +93,12 @@ function RecentJobs({ jobs, navigate }: { jobs: Job[]; navigate: (p: string) => 
 
 function QuotaCard({ jobs, loading }: { jobs: Job[]; loading: boolean }) {
   const today = new Date().toDateString()
+  // Only count jobs that actually ran — FAILED jobs are refunded by mark_failed,
+  // AWAITING_UPLOAD jobs haven't started yet.
   const usedToday = jobs.filter(j =>
     new Date(j.createdAt).toDateString() === today &&
-    j.status !== 'AWAITING_UPLOAD'
+    j.status !== 'AWAITING_UPLOAD' &&
+    j.status !== 'FAILED'
   ).length
   const remaining = Math.max(0, DAILY_QUOTA - usedToday)
   const pct = ((DAILY_QUOTA - remaining) / DAILY_QUOTA) * 100
