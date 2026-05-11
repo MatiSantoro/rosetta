@@ -166,7 +166,7 @@ export default function Login() {
           className="mt-6 text-xs text-center animate-slide-up stagger-4"
           style={{ color: 'var(--text-faint)' }}
         >
-          3 free translations per day · No credit card required
+          5 free translations per month · No credit card required
         </p>
       </div>
 

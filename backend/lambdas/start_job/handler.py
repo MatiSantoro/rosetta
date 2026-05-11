@@ -1,9 +1,11 @@
+from __future__ import annotations
 import json
 import os
 
 import boto3
+from boto3.dynamodb.conditions import Attr
 
-from ddb_utils import get_job, update_job_status
+from ddb_utils import get_job, get_user, update_job_status
 from s3_utils import object_exists
 from response import ok, err
 
@@ -11,9 +13,26 @@ ddb = boto3.resource("dynamodb")
 s3 = boto3.client("s3")
 sfn = boto3.client("stepfunctions")
 
-JOBS_TABLE = os.environ["JOBS_TABLE"]
-ARTIFACTS_BUCKET = os.environ["ARTIFACTS_BUCKET"]
+JOBS_TABLE        = os.environ["JOBS_TABLE"]
+USERS_TABLE       = os.environ["USERS_TABLE"]
+ARTIFACTS_BUCKET  = os.environ["ARTIFACTS_BUCKET"]
 STATE_MACHINE_ARN = os.environ.get("STATE_MACHINE_ARN", "")
+
+# Max concurrent RUNNING jobs for free-tier users.
+# Pro users always start immediately — this check is skipped for them.
+FREE_MAX_CONCURRENT = int(os.environ.get("FREE_MAX_CONCURRENT", "3"))
+
+
+def _count_running_free_jobs() -> int:
+    """Count how many free-tier jobs are currently RUNNING across all users."""
+    resp = ddb.Table(JOBS_TABLE).query(
+        IndexName="status-updatedAt-index",
+        KeyConditionExpression="#s = :running",
+        ExpressionAttributeNames={"#s": "status"},
+        ExpressionAttributeValues={":running": "RUNNING"},
+        Select="COUNT",
+    )
+    return resp.get("Count", 0)
 
 
 def handler(event, context):
@@ -21,7 +40,7 @@ def handler(event, context):
         return err(503, "Translation pipeline not yet configured.")
 
     user_id = event["requestContext"]["authorizer"]["jwt"]["claims"]["sub"]
-    job_id = event["pathParameters"]["id"]
+    job_id  = event["pathParameters"]["id"]
 
     job = get_job(ddb, JOBS_TABLE, user_id, job_id)
     if not job:
@@ -31,6 +50,16 @@ def handler(event, context):
 
     if not object_exists(s3, ARTIFACTS_BUCKET, job["inputS3Key"]):
         return err(400, "Upload not found. Upload the zip file before starting the job.")
+
+    # Priority gate: Pro jobs always start immediately.
+    # Free-tier jobs are held back if the system is busy so Pro users
+    # never wait behind free jobs. Upgrade removes this limit.
+    user = get_user(ddb, USERS_TABLE, user_id)
+    if user.get("tier", "free") != "pro" and not user.get("isAdmin", False):
+        running = _count_running_free_jobs()
+        if running >= FREE_MAX_CONCURRENT:
+            return err(429, "The system is busy — please try again in a moment. "
+                            "Upgrade to Pro for guaranteed instant processing.")
 
     sfn.start_execution(
         stateMachineArn=STATE_MACHINE_ARN,

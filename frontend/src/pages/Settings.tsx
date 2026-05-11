@@ -274,8 +274,8 @@ function ApiKeySection() {
 
 export default function Settings() {
   return (
-    <div className="max-w-xl mx-auto animate-fade-in">
-      <h1 className="font-display text-2xl font-bold mb-6" style={{ color: 'var(--text)' }}>
+    <div className="animate-fade-in">
+      <h1 className="text-2xl font-bold mb-6" style={{ color: 'var(--text)' }}>
         Settings
       </h1>
 
