@@ -27,6 +27,7 @@ locals {
 
   worker_env = {
     JOBS_TABLE         = var.jobs_table_name
+    QUOTA_TABLE        = var.usage_quota_table_name
     ARTIFACTS_BUCKET   = var.artifacts_bucket_name
     TRANSLATE_MODEL_ID = var.translate_model_id
     OPUS_MODEL_ID      = var.opus_model_id
@@ -142,7 +143,7 @@ resource "aws_iam_role_policy" "worker_app" {
         Sid    = "DynamoDB"
         Effect = "Allow"
         Action = ["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:PutItem"]
-        Resource = [var.jobs_table_arn]
+        Resource = [var.jobs_table_arn, var.usage_quota_table_arn]
       },
       {
         Sid    = "S3Objects"

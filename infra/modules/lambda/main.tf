@@ -1,12 +1,15 @@
 locals {
-  handler_names = toset(["create_job", "start_job", "get_job", "list_jobs", "get_download"])
+  handler_names = toset(["create_job", "start_job", "get_job", "list_jobs", "get_download", "billing", "get_user"])
 
   common_env = {
     JOBS_TABLE        = var.jobs_table_name
     QUOTA_TABLE       = var.usage_quota_table_name
+    USERS_TABLE       = var.users_table_name
     ARTIFACTS_BUCKET  = var.artifacts_bucket_name
-    DAILY_JOB_QUOTA   = tostring(var.daily_job_quota)
+    FREE_JOB_QUOTA    = tostring(var.daily_job_quota)
     STATE_MACHINE_ARN = var.state_machine_arn
+    APP_URL           = var.app_url
+    SSM_PREFIX        = var.ssm_prefix
   }
 }
 
@@ -72,6 +75,17 @@ resource "aws_iam_role_policy" "crud_app" {
             var.jobs_table_arn,
             "${var.jobs_table_arn}/index/*",
             var.usage_quota_table_arn,
+            var.users_table_arn,
+            "${var.users_table_arn}/index/*",
+          ]
+        },
+        {
+          Sid    = "SSMSecrets"
+          Effect = "Allow"
+          Action = ["ssm:GetParameter"]
+          Resource = [
+            "arn:aws:ssm:*:*:parameter/rosetta/prod/*",
+            "arn:aws:ssm:*:*:parameter/rosetta/dev/*",
           ]
         },
         {

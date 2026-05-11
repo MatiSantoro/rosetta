@@ -9,6 +9,7 @@ import json, os, subprocess, tempfile
 import boto3
 from botocore.config import Config
 from ddb_utils import update_job_step
+from bedrock_utils import bedrock_tool_call
 
 s3      = boto3.client("s3", config=Config(signature_version="s3v4"))
 ddb     = boto3.resource("dynamodb")
@@ -32,37 +33,97 @@ Review the {lang} files and identify ONLY errors that would cause deployment fai
 Do NOT flag style, optional properties, or security best practices.
 Return JSON only: {{"ok": true}} or {{"ok": false, "errors": [{{"file": "f", "msg": "m"}}]}}"""
 
+def _compute_units_to_retry(errors: list, raw_results: list, plan_units: list) -> list:
+    """
+    Given validation errors, return only the translation units that had failures.
+    Units with no errors are already correct and don't need re-translation.
+
+    Matching: error["file"] is the relative output path (e.g. "modules/storage/main.tf").
+    We look that path up in each unit's outputFiles list to find the owning unitId.
+    """
+    if not errors:
+        return []
+
+    # Build file_path → unitId index from translate results
+    file_to_unit: dict = {}
+    for item in raw_results:
+        if isinstance(item, dict) and "outputFiles" in item:
+            uid = item.get("unitId", "")
+            for f in item["outputFiles"]:
+                file_to_unit[f.get("path", "")] = uid
+
+    # Collect failed unit IDs
+    failed_ids: set = set()
+    for error in errors:
+        err_file = error.get("file", "")
+        uid = file_to_unit.get(err_file)
+        if uid:
+            failed_ids.add(uid)
+        else:
+            # Fuzzy match: error file may be a basename or partial path
+            for path, uid in file_to_unit.items():
+                if err_file and (err_file in path or path.endswith(err_file)):
+                    failed_ids.add(uid)
+                    break
+
+    if not failed_ids:
+        # Could not map errors to units — retry everything to be safe
+        return plan_units
+
+    return [u for u in plan_units if u.get("unitId", "") in failed_ids]
+
+
 def handler(event, context):
     update_job_step(ddb, JOBS_TABLE, event["userId"], event["jobId"], "VALIDATE")
-    target = event.get("targetLang", "")
-    cdk    = event.get("targetCdkLang")
-    key    = f"cdk_{cdk}" if target == "cdk" and cdk else target
-    bucket = event["artifactsBucket"]
+    target     = event.get("targetLang", "")
+    cdk        = event.get("targetCdkLang")
+    key        = f"cdk_{cdk}" if target == "cdk" and cdk else target
+    bucket     = event["artifactsBucket"]
+    plan_units = event.get("planResult", {}).get("units", [])
     raw_results = event.get("translateResults") or []
-    if not raw_results:
-        return {"ok": True, "errors": [], "warnings": []}
 
-    # translateResults is now a list of unit results, each with outputFiles list.
-    # Flatten to a single list of {path, outKey} records for the validators.
+    if not raw_results:
+        return {"ok": True, "errors": [], "warnings": [], "unitsToRetry": []}
+
+    # Flatten unit results → list of {path, outKey} for validators
     flat_results = []
     for item in raw_results:
         if isinstance(item, dict):
             if "outputFiles" in item:
-                # New unit-based format
                 flat_results.extend(item["outputFiles"])
             elif "outKey" in item:
-                # Legacy single-file format (backwards compat)
                 flat_results.append(item)
 
     if not flat_results:
-        return {"ok": True, "errors": [], "warnings": []}
+        return {"ok": True, "errors": [], "warnings": [], "unitsToRetry": []}
 
     if target in ("cloudformation", "sam"):
-        return validate_cfn(bucket, flat_results)
+        result = validate_cfn(bucket, flat_results)
     elif target == "terraform":
-        return validate_terraform(bucket, flat_results)
+        result = validate_terraform(bucket, flat_results)
     else:
-        return validate_bedrock(bucket, flat_results, key)
+        result = validate_bedrock(bucket, flat_results, key)
+
+    # Attach the list of units that need re-translation (empty when ok=True)
+    result["unitsToRetry"] = _compute_units_to_retry(
+        result.get("errors", []), raw_results, plan_units
+    )
+
+    # Persist the validation report to the Jobs table for the frontend to surface
+    user_id = event.get("userId")
+    job_id  = event.get("jobId")
+    if user_id and job_id:
+        ddb.Table(JOBS_TABLE).update_item(
+            Key={"userId": user_id, "jobId": job_id},
+            UpdateExpression="SET validationReport = :r",
+            ExpressionAttributeValues={":r": {
+                "ok":       result["ok"],
+                "errors":   result.get("errors", []),
+                "warnings": result.get("warnings", []),
+            }},
+        )
+
+    return result
 
 def _download(bucket, res):
     out_key = res.get("outKey")
@@ -166,16 +227,24 @@ def validate_bedrock(bucket, results, lang_key):
     if not files:
         return {"ok": True, "errors": [], "warnings": []}
     try:
-        resp = bedrock.converse(
+        _, r = bedrock_tool_call(
+            bedrock,
+            tool_name="report_validation",
+            tool_description="Report structural validation results for the generated IaC code.",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "ok":       {"type": "boolean", "description": "True if no blocking errors found"},
+                    "errors":   {"type": "array",   "items": {"type": "object", "properties": {"file": {"type": "string"}, "msg": {"type": "string"}}, "required": ["file", "msg"]}},
+                    "warnings": {"type": "array",   "items": {"type": "string"}},
+                },
+                "required": ["ok", "errors", "warnings"],
+            },
             modelId=VALIDATE_MODEL_ID,
             system=[{"text": BEDROCK_SYSTEM.format(lang=lang)}],
-            messages=[{"role": "user", "content": [
-                {"text": f"Validate:\n\n" + "\n\n".join(files)}]}],
-            inferenceConfig={"maxTokens": 1024})
-        raw = resp["output"]["message"]["content"][0]["text"].strip()
-        if raw.startswith("```"): raw = raw.split("\n",1)[1].rsplit("```",1)[0].strip()
-        r = json.loads(raw)
-        return {"ok": bool(r.get("ok", True)), "errors": r.get("errors",[]),
-                "warnings": r.get("warnings",[])}
+            messages=[{"role": "user", "content": [{"text": "Validate:\n\n" + "\n\n".join(files)}]}],
+            inferenceConfig={"maxTokens": 1024},
+        )
+        return {"ok": bool(r.get("ok", True)), "errors": r.get("errors", []), "warnings": r.get("warnings", [])}
     except Exception as e:
         return {"ok": True, "errors": [], "warnings": [f"Bedrock validation skipped: {str(e)[:100]}"]}

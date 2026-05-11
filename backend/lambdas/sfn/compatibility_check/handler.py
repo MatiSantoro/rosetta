@@ -10,6 +10,7 @@ import re
 import boto3
 
 from ddb_utils import update_job_step
+from bedrock_utils import bedrock_tool_call
 
 s3      = boto3.client("s3")
 ddb     = boto3.resource("dynamodb")
@@ -69,21 +70,26 @@ def handler(event, context):
         + "\n\nAre ALL of these serverless-compatible for AWS SAM?"
     )
 
-    response = bedrock.converse(
-        modelId=COMPAT_MODEL_ID,
-        system=[{"text": SYSTEM_PROMPT}],
-        messages=[{"role": "user", "content": [{"text": user_msg}]}],
-        inferenceConfig={"maxTokens": 256},
-    )
-
-    raw = response["output"]["message"]["content"][0]["text"].strip()
-
     try:
-        result = json.loads(raw)
-        if "compatible" not in result:
-            raise ValueError("missing compatible key")
-    except (json.JSONDecodeError, ValueError):
-        # Fail open — don't block users on a classification parse error
-        result = {"compatible": True, "reasons": ["Classification response could not be parsed — defaulting to compatible"]}
+        _, result = bedrock_tool_call(
+            bedrock,
+            tool_name="report_compatibility",
+            tool_description="Report whether all resource types are serverless-compatible with AWS SAM.",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "compatible": {"type": "boolean", "description": "True if ALL resource types are SAM-compatible"},
+                    "reasons":    {"type": "array", "items": {"type": "string"}, "description": "Reasons why incompatible (empty if compatible)"},
+                },
+                "required": ["compatible", "reasons"],
+            },
+            modelId=COMPAT_MODEL_ID,
+            system=[{"text": SYSTEM_PROMPT}],
+            messages=[{"role": "user", "content": [{"text": user_msg}]}],
+            inferenceConfig={"maxTokens": 512},
+        )
+    except Exception:
+        # Fail open — don't block users on a classification error
+        result = {"compatible": True, "reasons": ["Classification could not be completed — defaulting to compatible"]}
 
     return result

@@ -37,3 +37,13 @@ output "dashboard_url" {
 output "alerts_sns_arn" {
   value = module.observability.sns_topic_arn
 }
+
+output "acm_certificate_arn" {
+  value       = aws_acm_certificate.main.arn
+  description = "ARN of the wildcard ACM cert — needed for Amplify custom domain."
+}
+
+output "route53_zone_id" {
+  value       = data.aws_route53_zone.main.zone_id
+  description = "Route 53 hosted zone ID — needed for Amplify custom domain DNS."
+}

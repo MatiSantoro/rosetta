@@ -42,3 +42,13 @@ output "kms_key_id" {
   description = "ID of the KMS key (for IAM policy refs)."
   value       = aws_kms_key.this.key_id
 }
+
+output "users_table_name" {
+  description = "Name of the Users DynamoDB table."
+  value       = aws_dynamodb_table.users.name
+}
+
+output "users_table_arn" {
+  description = "ARN of the Users DynamoDB table."
+  value       = aws_dynamodb_table.users.arn
+}

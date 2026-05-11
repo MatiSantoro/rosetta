@@ -9,6 +9,8 @@ import boto3
 from botocore.config import Config
 
 from ddb_utils import update_job_step, add_job_tokens
+from bedrock_utils import bedrock_tool_call
+from toon_utils import toon_symbol_table
 
 s3      = boto3.client("s3", config=Config(signature_version="s3v4"))
 ddb     = boto3.resource("dynamodb")
@@ -33,42 +35,65 @@ LANG_LABELS = {
 def lang_key(lang, cdk_lang=None):
     return f"cdk_{cdk_lang}" if lang == "cdk" and cdk_lang else lang
 
-SYSTEM_PROMPT = (
-    "You are an expert AWS infrastructure engineer specialising in IaC translation.\n\n"
-    "You will receive one or more source files from a single directory/module and must\n"
-    "translate them as a UNIT into the target language.\n\n"
-    "CRITICAL OUTPUT FORMAT:\n"
-    'Return ONLY valid JSON - no markdown, no explanation outside the JSON:\n'
-    '{"files": [{"path": "relative/output/path/filename.ext", "content": "full file content"}]}\n\n'
-    "GENERAL RULES:\n"
-    "1. Produce ALL files listed in expected_output_files.\n"
-    "2. Every CloudFormation/SAM template MUST have a Resources section.\n"
-    "3. Terraform output: split into main.tf + variables.tf + outputs.tf.\n"
-    "   Root modules also get providers.tf and backend.tf; child modules do not.\n"
-    "4. CDK output: one class file per Stack (root) or Construct (module).\n"
-    "5. Preserve Lambda zip file references - never translate zip files.\n"
-    "6. Only declare data sources actually used in output.\n"
-    "7. Convert identifiers: snake_case (Terraform), PascalCase (CloudFormation), camelCase (CDK).\n"
-    "8. Symbol table identifiers: reference them, do not redefine.\n"
-    "9. Do NOT add hardening not present in source.\n\n"
-    "TERRAFORM TARGET:\n"
-    "- aws_iam_role_policy_attachment (never managed_policy_arns on role).\n"
-    "- Lambda without code: filename = \"placeholder.zip\" + lifecycle ignore_changes.\n"
-    "- Lambda WITH zip ref: use the relative path provided.\n"
-    "- snake_case resource names, no resource type repetition.\n\n"
-    "CLOUDFORMATION/SAM TARGET:\n"
-    "- Merge ALL directory files into ONE template file.\n"
-    "- variables.tf -> Parameters (same file as Resources).\n"
-    "- outputs.tf -> Outputs (same file as Resources).\n"
-    "- Use !Ref, !GetAtt, !Sub correctly.\n"
-    "- Stateful resources: DeletionPolicy: Retain + UpdateReplacePolicy: Retain.\n\n"
-    "CDK TARGET:\n"
-    "- Import from aws-cdk-lib only (never @aws-cdk/* scoped packages).\n"
-    "- L2 constructs preferred; L1 (Cfn*) as fallback.\n"
-    "- Typed enums not raw strings.\n"
-    '- Lambda with zip: Code.fromAsset("path/to/lambda.zip").\n'
-    "- Grant methods instead of manual IAM policies."
-)
+# ── System prompt: base rules always sent; target rules only when relevant ────
+# Splitting saves 200–400 tokens per call by excluding irrelevant sections.
+# The combined (base + target) prompt is cached — parallel units and retries
+# within the same job share the same target, so they all get cache hits.
+
+_SYSTEM_BASE = """\
+You are an expert AWS infrastructure engineer specialising in IaC translation.
+
+You will receive one or more source files from a single directory/module and must
+translate them as a UNIT into the target language.
+
+GENERAL RULES:
+1. Produce ALL files listed in expected_output_files.
+2. Every CloudFormation/SAM template MUST have a Resources section.
+3. Terraform output: split into main.tf + variables.tf + outputs.tf.
+   Root modules also get providers.tf and backend.tf; child modules do not.
+4. CDK output: one class file per Stack (root) or Construct (module).
+5. Preserve Lambda zip file references — never translate zip files.
+6. Only declare data sources actually used in output.
+7. Convert identifiers: snake_case (Terraform), PascalCase (CloudFormation), camelCase (CDK).
+8. Symbol table identifiers: reference them, do not redefine.
+9. Do NOT add hardening not present in source."""
+
+_TARGET_RULES = {
+    "terraform": """
+TARGET-SPECIFIC RULES — TERRAFORM:
+- Use aws_iam_role_policy_attachment (never managed_policy_arns on the role resource).
+- Lambda without code: filename = "placeholder.zip" + lifecycle { ignore_changes = [filename] }.
+- Lambda WITH zip ref: use the relative path provided in lambdaZipRefs.
+- snake_case resource names, never repeat the resource type in the name.""",
+
+    "cloudformation": """
+TARGET-SPECIFIC RULES — CLOUDFORMATION:
+- Merge ALL directory files into ONE template file.
+- variables.tf → Parameters section; outputs.tf → Outputs section (same file as Resources).
+- Use !Ref, !GetAtt, !Sub for cross-resource references.
+- Stateful resources: add DeletionPolicy: Retain and UpdateReplacePolicy: Retain.""",
+
+    "sam": """
+TARGET-SPECIFIC RULES — SAM:
+- Merge ALL directory files into ONE template file with Transform: AWS::Serverless-2016-10-31.
+- variables.tf → Parameters section; outputs.tf → Outputs section.
+- Use AWS::Serverless::* resource types for Lambda, API, DynamoDB where available.
+- Stateful resources: add DeletionPolicy: Retain and UpdateReplacePolicy: Retain.""",
+
+    "cdk": """
+TARGET-SPECIFIC RULES — CDK:
+- Import from aws-cdk-lib only (never @aws-cdk/* scoped packages).
+- Prefer L2 constructs; fall back to L1 (Cfn*) only when no L2 exists.
+- Use typed enums (e.g. s3.BucketEncryption.S3_MANAGED) not raw strings.
+- Lambda with zip: Code.fromAsset("path/to/lambda.zip").
+- Use grant methods (grantRead, grantReadWrite) instead of manual IAM policies.""",
+}
+
+
+def build_system_prompt(target_lang: str) -> str:
+    """Return base rules + the single relevant target-language section."""
+    target_rules = _TARGET_RULES.get(target_lang, "")
+    return _SYSTEM_BASE + target_rules
 
 
 def handler(event, context):
@@ -111,7 +136,8 @@ def handler(event, context):
 
     sym_section = ""
     if dep_graph.get("symbolTable"):
-        sym_section = "\n\nSymbol table (OTHER units - reference do not redefine):\n" + json.dumps(dep_graph["symbolTable"], indent=2)[:2000]
+        # TOON encoding saves ~40% tokens vs JSON on the symbol table
+        sym_section = "\n\nSymbol table — OTHER units (reference, do not redefine):\n" + toon_symbol_table(dep_graph["symbolTable"])[:2000]
 
     zip_refs = unit.get("lambdaZipRefs", [])
     zip_section = ""
@@ -133,26 +159,43 @@ def handler(event, context):
         "Return the JSON with all output files."
     )
 
-    model_id = OPUS_MODEL_ID if use_opus else TRANSLATE_MODEL_ID
-    response = bedrock.converse(
+    translate_schema = {
+        "type": "object",
+        "properties": {
+            "files": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "path":    {"type": "string", "description": "Relative output path, e.g. 'modules/storage/main.tf'"},
+                        "content": {"type": "string", "description": "Full file content"},
+                    },
+                    "required": ["path", "content"],
+                },
+            },
+        },
+        "required": ["files"],
+    }
+
+    model_id      = OPUS_MODEL_ID if use_opus else TRANSLATE_MODEL_ID
+    system_prompt = build_system_prompt(target_lang)
+
+    response, result = bedrock_tool_call(
+        bedrock,
+        tool_name="submit_translated_files",
+        tool_description="Submit all translated output files for this translation unit.",
+        output_schema=translate_schema,
+        use_cache=True,   # caches system prompt + tool schema across parallel units
         modelId=model_id,
-        system=[{"text": SYSTEM_PROMPT}],
+        system=[{"text": system_prompt}],
         messages=[{"role": "user", "content": [{"text": user_msg}]}],
-        inferenceConfig={"maxTokens": 8192},
+        inferenceConfig={"maxTokens": 16000},
     )
 
-    raw        = response["output"]["message"]["content"][0]["text"].strip()
     tokens_in  = response["usage"]["inputTokens"]
     tokens_out = response["usage"]["outputTokens"]
-
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-
-    try:
-        result = json.loads(raw)
-        files  = result.get("files", [])
-    except json.JSONDecodeError:
-        raise ValueError(f"Translate returned invalid JSON for unit {unit_id}")
+    files      = result.get("files", [])
 
     if not files:
         raise ValueError(f"Translate returned no files for unit {unit_id}")

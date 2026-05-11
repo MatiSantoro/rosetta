@@ -10,6 +10,14 @@ variable "jobs_table_arn" {
   type = string
 }
 
+variable "usage_quota_table_name" {
+  type = string
+}
+
+variable "usage_quota_table_arn" {
+  type = string
+}
+
 variable "artifacts_bucket_name" {
   type = string
 }

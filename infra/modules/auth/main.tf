@@ -120,12 +120,27 @@ resource "aws_cognito_user_pool_client" "spa" {
 }
 
 # ---------------------------------------------------------------------------
-# Hosted UI on a Cognito-managed domain. (Custom domains require an ACM cert
-# in us-east-1 and DNS work; defer to post-MVP.) The domain prefix must be
-# globally unique within the region.
+# Hosted UI domain — custom (auth.<domain>) or Cognito-managed fallback
 # ---------------------------------------------------------------------------
 
 resource "aws_cognito_user_pool_domain" "this" {
-  domain       = var.name_prefix
-  user_pool_id = aws_cognito_user_pool.this.id
+  domain          = var.custom_domain != "" ? "auth.${var.custom_domain}" : var.name_prefix
+  certificate_arn = var.custom_domain != "" ? var.acm_certificate_arn : null
+  user_pool_id    = aws_cognito_user_pool.this.id
+}
+
+# Route 53 alias record for the custom auth subdomain.
+# Cognito custom domains are backed by a CloudFront distribution;
+# the CloudFront hosted zone ID is always Z2FDTNDATAQYW2.
+resource "aws_route53_record" "auth" {
+  count   = var.custom_domain != "" ? 1 : 0
+  zone_id = var.hosted_zone_id
+  name    = "auth.${var.custom_domain}"
+  type    = "A"
+
+  alias {
+    name                   = aws_cognito_user_pool_domain.this.cloudfront_distribution
+    zone_id                = "Z2FDTNDATAQYW2"
+    evaluate_target_health = false
+  }
 }

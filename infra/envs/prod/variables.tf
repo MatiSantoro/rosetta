@@ -3,6 +3,12 @@ variable "project" {
   default = "rosetta"
 }
 
+variable "domain_name" {
+  description = "Root domain registered in Route 53, e.g. 'rosetta-translate.com'."
+  type        = string
+  default     = "rosetta-translate.com"
+}
+
 variable "env" {
   type    = string
   default = "prod"

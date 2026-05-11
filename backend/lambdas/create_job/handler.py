@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 import uuid
@@ -6,18 +8,19 @@ from datetime import datetime, timezone, timedelta
 import boto3
 from botocore.config import Config
 
-from ddb_utils import check_and_increment_quota
+from ddb_utils import check_and_increment_quota, get_user
 from s3_utils import presigned_put
 from response import ok, err
 
 ddb = boto3.resource("dynamodb")
 s3 = boto3.client("s3", config=Config(signature_version="s3v4"))
 
-JOBS_TABLE = os.environ["JOBS_TABLE"]
-QUOTA_TABLE = os.environ["QUOTA_TABLE"]
+JOBS_TABLE      = os.environ["JOBS_TABLE"]
+QUOTA_TABLE     = os.environ["QUOTA_TABLE"]
+USERS_TABLE     = os.environ["USERS_TABLE"]
 ARTIFACTS_BUCKET = os.environ["ARTIFACTS_BUCKET"]
-DAILY_JOB_QUOTA = int(os.environ.get("DAILY_JOB_QUOTA", "3"))
-UPLOAD_TTL = 300  # 5 min presigned URL
+FREE_JOB_QUOTA  = int(os.environ.get("FREE_JOB_QUOTA", "5"))
+UPLOAD_TTL      = 300  # 5 min presigned URL
 
 VALID_LANGS = {"terraform", "cdk", "cloudformation", "sam"}
 VALID_CDK_LANGS = {"typescript", "python", "java", "csharp", "go"}
@@ -45,9 +48,11 @@ def handler(event, context):
     if target_lang == "cdk" and target_cdk_lang not in VALID_CDK_LANGS:
         return err(400, f"targetCdkLang required for CDK. Must be one of: {', '.join(VALID_CDK_LANGS)}")
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    if not check_and_increment_quota(ddb, QUOTA_TABLE, user_id, today, DAILY_JOB_QUOTA):
-        return err(429, f"Daily job quota of {DAILY_JOB_QUOTA} reached. Try again tomorrow.")
+    user = get_user(ddb, USERS_TABLE, user_id)
+    quota_limit = int(user.get("quotaLimit", FREE_JOB_QUOTA))
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    if not check_and_increment_quota(ddb, QUOTA_TABLE, user_id, month, quota_limit):
+        return err(429, f"Monthly job quota of {quota_limit} reached. Upgrade to Pro for more translations.")
 
     job_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
@@ -55,18 +60,18 @@ def handler(event, context):
     input_s3_key = f"inputs/{user_id}/{job_id}/upload.zip"
 
     item = {
-        "userId": user_id,
-        "jobId": job_id,
-        "status": "AWAITING_UPLOAD",
+        "userId":     user_id,
+        "jobId":      job_id,
+        "status":     "AWAITING_UPLOAD",
         "sourceLang": source_lang,
         "targetLang": target_lang,
         "inputS3Key": input_s3_key,
-        "createdAt": now,
-        "updatedAt": now,
+        "createdAt":  now,
+        "updatedAt":  now,
         "retryCount": 0,
-        "tokensIn": 0,
-        "tokensOut": 0,
-        "expiresAt": expires_at,
+        "tokensIn":   0,
+        "tokensOut":  0,
+        "expiresAt":  expires_at,
     }
     if source_cdk_lang:
         item["sourceCdkLang"] = source_cdk_lang

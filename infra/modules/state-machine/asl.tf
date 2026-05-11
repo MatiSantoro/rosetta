@@ -169,7 +169,12 @@ locals {
           "targetCdkLang.$"    = "$.targetCdkLang"
           "artifactsBucket.$"  = "$.artifactsBucket"
           "preflightResult.$"  = "$.preflightResult"
-          "planResult.$"       = "$.planResult"
+          planResult = {
+            # Only re-translate units that had validation errors — skip clean units
+            "units.$"       = "$.validateResult.unitsToRetry"
+            "symbolTable.$" = "$.planResult.symbolTable"
+            "planNotes.$"   = "$.planResult.planNotes"
+          }
           "validateResult.$"   = "$.validateResult"
           "retryCount.$"       = "States.MathAdd($.retryCount, 1)"
           useOpus              = false
@@ -188,7 +193,12 @@ locals {
           "targetCdkLang.$"    = "$.targetCdkLang"
           "artifactsBucket.$"  = "$.artifactsBucket"
           "preflightResult.$"  = "$.preflightResult"
-          "planResult.$"       = "$.planResult"
+          planResult = {
+            # Only re-translate units that had validation errors — skip clean units
+            "units.$"       = "$.validateResult.unitsToRetry"
+            "symbolTable.$" = "$.planResult.symbolTable"
+            "planNotes.$"   = "$.planResult.planNotes"
+          }
           "validateResult.$"   = "$.validateResult"
           "retryCount.$"       = "States.MathAdd($.retryCount, 1)"
           useOpus              = true

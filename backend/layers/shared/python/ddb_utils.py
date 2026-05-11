@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone, timedelta
 from botocore.exceptions import ClientError
 
 
 def check_and_increment_quota(ddb, table_name: str, user_id: str, date: str, cap: int) -> bool:
-    """Atomically increments the daily job counter. Returns False if the cap is already reached."""
+    """Atomically increments the monthly job counter. Returns False if cap reached.
+    date should be YYYY-MM format for monthly tracking."""
     table = ddb.Table(table_name)
-    expires_at = int((datetime.now(timezone.utc) + timedelta(days=7)).timestamp())
+    # TTL = 40 days from now (covers full month + buffer)
+    expires_at = int((datetime.now(timezone.utc) + timedelta(days=40)).timestamp())
     try:
         table.update_item(
             Key={"userId": user_id, "date": date},
@@ -18,6 +22,22 @@ def check_and_increment_quota(ddb, table_name: str, user_id: str, date: str, cap
         if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
             return False
         raise
+
+
+def decrement_quota(ddb, table_name: str, user_id: str, date: str) -> None:
+    """Decrements the monthly job counter by 1 (minimum 0). Call on job failure to refund the slot.
+    date should be YYYY-MM format for monthly tracking."""
+    table = ddb.Table(table_name)
+    try:
+        table.update_item(
+            Key={"userId": user_id, "date": date},
+            UpdateExpression="ADD jobCount :neg",
+            ConditionExpression="attribute_exists(jobCount) AND jobCount > :zero",
+            ExpressionAttributeValues={":neg": -1, ":zero": 0},
+        )
+    except Exception:
+        # If the item doesn't exist or count is already 0, silently ignore
+        pass
 
 
 def get_job(ddb, table_name: str, user_id: str, job_id: str) -> dict | None:
@@ -79,3 +99,56 @@ def update_job_status(
         ExpressionAttributeNames=names,
         ExpressionAttributeValues=values,
     )
+
+
+# ── Users table ───────────────────────────────────────────────────────────────
+
+def get_user(ddb, table_name: str, user_id: str) -> dict:
+    """Returns the user record. Returns defaults if not found (free tier)."""
+    resp = ddb.Table(table_name).get_item(Key={"userId": user_id})
+    return resp.get("Item", {
+        "userId":             user_id,
+        "tier":               "free",
+        "quotaLimit":         5,
+        "apiKey":             None,
+        "stripeCustomerId":   None,
+        "subscriptionStatus": None,
+    })
+
+
+def upsert_user(ddb, table_name: str, user_id: str, **attrs) -> None:
+    """Create or update a user record with the provided attributes."""
+    now = datetime.now(timezone.utc).isoformat()
+    set_parts = ["updatedAt = :now"]
+    values = {":now": now}
+    names = {}
+
+    for k, v in attrs.items():
+        placeholder = f":_{k}"
+        set_parts.append(f"#{k} = {placeholder}")
+        values[placeholder] = v
+        names[f"#{k}"] = k
+
+    set_parts.append("createdAt = if_not_exists(createdAt, :now)")
+
+    kwargs: dict = {
+        "Key":                    {"userId": user_id},
+        "UpdateExpression":       "SET " + ", ".join(set_parts),
+        "ExpressionAttributeValues": values,
+    }
+    if names:
+        kwargs["ExpressionAttributeNames"] = names
+
+    ddb.Table(table_name).update_item(**kwargs)
+
+
+def get_user_by_stripe_id(ddb, table_name: str, stripe_customer_id: str) -> dict | None:
+    """Look up a user by Stripe customer ID using GSI."""
+    from boto3.dynamodb.conditions import Key as DdbKey
+    resp = ddb.Table(table_name).query(
+        IndexName="stripeCustomerId-index",
+        KeyConditionExpression=DdbKey("stripeCustomerId").eq(stripe_customer_id),
+        Limit=1,
+    )
+    items = resp.get("Items", [])
+    return items[0] if items else None

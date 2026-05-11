@@ -1,11 +1,14 @@
 locals {
-  # route key → Lambda handler name
+  # route key → Lambda handler name (all JWT-protected)
   routes = {
     "POST /jobs"              = "create_job"
     "POST /jobs/{id}/start"   = "start_job"
     "GET /jobs/{id}/download" = "get_download"
     "GET /jobs/{id}"          = "get_job"
     "GET /jobs"               = "list_jobs"
+    "POST /billing/checkout"  = "billing"
+    "POST /billing/portal"    = "billing"
+    "GET /user/profile"       = "get_user"
   }
 }
 
@@ -69,6 +72,24 @@ resource "aws_apigatewayv2_route" "routes" {
   target             = "integrations/${aws_apigatewayv2_integration.handlers[each.key].id}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+# ---------------------------------------------------------------------------
+# Stripe webhook route — no JWT auth (Stripe signature verifies authenticity)
+# ---------------------------------------------------------------------------
+
+resource "aws_apigatewayv2_integration" "webhook" {
+  api_id                 = aws_apigatewayv2_api.this.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = var.lambda_invoke_arns["billing"]
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "webhook" {
+  api_id    = aws_apigatewayv2_api.this.id
+  route_key = "POST /billing/webhook"
+  target    = "integrations/${aws_apigatewayv2_integration.webhook.id}"
+  # No authorization_type — Stripe signature handles auth
 }
 
 # ---------------------------------------------------------------------------

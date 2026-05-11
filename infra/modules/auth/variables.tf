@@ -23,6 +23,24 @@ variable "logout_urls" {
   type        = list(string)
 }
 
+variable "custom_domain" {
+  description = "Custom domain for the Cognito Hosted UI, e.g. 'rosetta-translate.com'. Leave empty to use the Cognito-managed domain."
+  type        = string
+  default     = ""
+}
+
+variable "acm_certificate_arn" {
+  description = "ACM certificate ARN (us-east-1) for the custom Cognito domain. Required when custom_domain is set."
+  type        = string
+  default     = ""
+}
+
+variable "hosted_zone_id" {
+  description = "Route 53 hosted zone ID for the custom domain. Required when custom_domain is set."
+  type        = string
+  default     = ""
+}
+
 variable "advanced_security_mode" {
   description = "Cognito advanced security mode. OFF for free tier; AUDIT or ENFORCED costs $0.05/MAU."
   type        = string

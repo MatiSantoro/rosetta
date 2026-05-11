@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Download, AlertCircle, CheckCircle, ArrowRight, Copy, Check } from 'lucide-react'
+import { ArrowLeft, Download, AlertCircle, CheckCircle, ArrowRight, Copy, Check, Lock } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { getJob, getDownloadUrl, type Job, type LangKey } from '../lib/api'
 import StatusBadge from '../components/StatusBadge'
@@ -222,6 +222,126 @@ function CopyId({ id }: { id: string }) {
   )
 }
 
+// ── Validation report ───────────────────────────────────────────────────────
+
+function ValidationReport({ report }: { report: NonNullable<Job['validationReport']> }) {
+  const [warningsOpen, setWarningsOpen] = useState(false)
+  const hasErrors   = report.errors.length > 0
+  const hasWarnings = report.warnings.length > 0
+
+  return (
+    <div className="card p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-semibold uppercase tracking-widest"
+           style={{ color: 'var(--text-faint)' }}>
+          Validation Report
+        </p>
+        <span
+          className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+          style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', border: '1px solid var(--accent)' }}
+        >
+          Pro feature
+        </span>
+      </div>
+
+      {/* Summary row */}
+      <div className="flex items-center gap-4 mb-3">
+        {report.ok ? (
+          <span className="flex items-center gap-1.5 text-sm font-medium" style={{ color: '#22C55E' }}>
+            <Check size={14} />
+            Passed
+          </span>
+        ) : (
+          <span className="flex items-center gap-1.5 text-sm font-medium" style={{ color: '#DC2626' }}>
+            <AlertCircle size={14} />
+            {report.errors.length} {report.errors.length === 1 ? 'error' : 'errors'}
+          </span>
+        )}
+        {hasWarnings && (
+          <span className="flex items-center gap-1.5 text-sm" style={{ color: '#D97706' }}>
+            <AlertCircle size={13} />
+            {report.warnings.length} {report.warnings.length === 1 ? 'warning' : 'warnings'}
+          </span>
+        )}
+      </div>
+
+      {/* Errors list */}
+      {hasErrors && (
+        <div className="rounded-lg overflow-hidden mb-3"
+             style={{ background: '#DC262608', border: '1px solid #DC262620' }}>
+          <div className="space-y-0">
+            {report.errors.map((e, i) => (
+              <div key={i} className="px-3 py-2 border-b last:border-b-0 text-xs"
+                   style={{ borderColor: '#DC262618' }}>
+                <span className="font-mono" style={{ color: '#DC2626' }}>{e.file}</span>
+                <span style={{ color: 'var(--text-faint)' }}>: </span>
+                <span style={{ color: 'var(--text-muted)' }}>{e.msg}</span>
+                {e.rule && (
+                  <span className="ml-2 font-mono text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                    [{e.rule}]
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Warnings collapsible */}
+      {hasWarnings && (
+        <div>
+          <button
+            onClick={() => setWarningsOpen(o => !o)}
+            className="flex items-center gap-1.5 text-xs mb-2 transition-colors"
+            style={{ color: '#D97706' }}
+          >
+            <AlertCircle size={11} />
+            {warningsOpen ? 'Hide' : 'Show'} {report.warnings.length} {report.warnings.length === 1 ? 'warning' : 'warnings'}
+          </button>
+          {warningsOpen && (
+            <div className="rounded-lg overflow-hidden"
+                 style={{ background: '#D9770608', border: '1px solid #D9770620' }}>
+              {report.warnings.map((w, i) => (
+                <div key={i} className="px-3 py-2 border-b last:border-b-0 text-xs"
+                     style={{ borderColor: '#D9770618', color: 'var(--text-muted)' }}>
+                  {w}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LockedValidation() {
+  const navigate = useNavigate()
+  return (
+    <div className="card p-4 mb-4 flex items-start gap-3"
+         style={{ border: '1px solid var(--border)' }}>
+      <Lock size={15} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--text-faint)' }} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium mb-0.5" style={{ color: 'var(--text-muted)' }}>
+          Detailed Validation Report
+        </p>
+        <p className="text-xs mb-2" style={{ color: 'var(--text-faint)' }}>
+          See line-by-line cfn-lint and terraform output.
+        </p>
+        <button
+          onClick={() => navigate('/settings')}
+          className="text-xs font-medium transition-colors"
+          style={{ color: 'var(--accent)' }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = '0.75')}
+          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+        >
+          Upgrade to Pro →
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ──────────────────────────────────────────────────────────
 
 export default function JobDetail() {
@@ -303,6 +423,12 @@ export default function JobDetail() {
         </p>
         <PipelineSteps job={job} />
       </div>
+
+      {/* Validation report (Pro) */}
+      {job.validationReport
+        ? <ValidationReport report={job.validationReport} />
+        : <LockedValidation />
+      }
 
       {/* Error */}
       {job.status === 'FAILED' && (

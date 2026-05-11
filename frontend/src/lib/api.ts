@@ -32,6 +32,11 @@ export interface Job {
   tokensOut:    number
   errorMsg?:    string
   skippedFiles?: { path: string; reason: string }[]
+  validationReport?: {
+    ok: boolean
+    errors: Array<{ file: string; msg: string; rule?: string }>
+    warnings: string[]
+  }
 }
 
 export interface CreateJobResponse {
@@ -39,21 +44,29 @@ export interface CreateJobResponse {
   uploadUrl: string
 }
 
+export interface UserProfile {
+  userId: string
+  tier: 'free' | 'pro'
+  quotaLimit: number
+  subscriptionStatus: string | null
+  apiKey: string | null
+}
+
 // ── Fetch wrapper ───────────────────────────────────────────────────────────
 
-async function apiFetch<T>(
-  method: string,
+export async function apiFetch<T>(
   path: string,
-  body?: unknown,
+  init?: RequestInit,
 ): Promise<T> {
   const token = await getAccessToken()
   const res = await fetch(`${BASE}${path}`, {
-    method,
+    method: 'GET',
+    ...init,
     headers: {
       Authorization:  `Bearer ${token}`,
       'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
@@ -66,11 +79,11 @@ async function apiFetch<T>(
 
 export async function listJobs(nextToken?: string): Promise<{ items: Job[]; nextToken?: string }> {
   const qs = nextToken ? `?nextToken=${encodeURIComponent(nextToken)}` : ''
-  return apiFetch('GET', `/jobs${qs}`)
+  return apiFetch(`/jobs${qs}`)
 }
 
 export async function getJob(jobId: string): Promise<Job> {
-  return apiFetch('GET', `/jobs/${jobId}`)
+  return apiFetch(`/jobs/${jobId}`)
 }
 
 export async function createJob(payload: {
@@ -79,15 +92,15 @@ export async function createJob(payload: {
   sourceCdkLang?: CdkLang
   targetCdkLang?: CdkLang
 }): Promise<CreateJobResponse> {
-  return apiFetch('POST', '/jobs', payload)
+  return apiFetch('/jobs', { method: 'POST', body: JSON.stringify(payload) })
 }
 
 export async function startJob(jobId: string): Promise<{ jobId: string; status: string }> {
-  return apiFetch('POST', `/jobs/${jobId}/start`)
+  return apiFetch(`/jobs/${jobId}/start`, { method: 'POST' })
 }
 
 export async function getDownloadUrl(jobId: string): Promise<{ downloadUrl: string; status: string }> {
-  return apiFetch('GET', `/jobs/${jobId}/download`)
+  return apiFetch(`/jobs/${jobId}/download`)
 }
 
 export async function uploadZip(uploadUrl: string, file: File): Promise<void> {
@@ -97,6 +110,20 @@ export async function uploadZip(uploadUrl: string, file: File): Promise<void> {
     body:    file,
   })
   if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
+}
+
+// ── User & billing ──────────────────────────────────────────────────────────
+
+export async function getUserProfile(): Promise<UserProfile> {
+  return apiFetch('/user/profile')
+}
+
+export async function createCheckoutSession(): Promise<{ url: string }> {
+  return apiFetch('/billing/checkout', { method: 'POST' })
+}
+
+export async function createPortalSession(): Promise<{ url: string }> {
+  return apiFetch('/billing/portal', { method: 'POST' })
 }
 
 // ── Full job submission flow ────────────────────────────────────────────────

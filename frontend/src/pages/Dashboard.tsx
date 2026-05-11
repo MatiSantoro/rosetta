@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Plus, ArrowRight, Clock, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react'
-import { listJobs, type Job, type LangKey } from '../lib/api'
+import { listJobs, getUserProfile, type Job, type LangKey } from '../lib/api'
 import StatusBadge from '../components/StatusBadge'
 
 // ── Types & constants ──────────────────────────────────────────────────────
@@ -212,6 +212,12 @@ export default function Dashboard() {
     staleTime:       30_000,
   })
 
+  const { data: profile } = useQuery({
+    queryKey: ['user-profile'],
+    queryFn: getUserProfile,
+    refetchOnWindowFocus: false,
+  })
+
   const sorted = useMemo(
     () => sortJobs(data?.items ?? [], sort),
     [data?.items, sort]
@@ -311,6 +317,23 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+
+          {/* History limit note for free users when exactly 3 jobs are returned */}
+          {profile?.tier === 'free' && sorted.length === 3 && !hasNext && (
+            <p className="text-xs text-center mt-4" style={{ color: 'var(--text-faint)' }}>
+              Showing your 3 most recent translations.{' '}
+              <button
+                onClick={() => navigate('/settings')}
+                className="underline transition-colors"
+                style={{ color: 'var(--text-muted)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+              >
+                Upgrade to Pro
+              </button>{' '}
+              for full history.
+            </p>
+          )}
 
           {(page > 1 || hasNext) && (
             <div className="mt-6">

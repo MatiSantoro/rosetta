@@ -44,11 +44,15 @@ module "lambda" {
   jobs_table_arn         = module.storage.jobs_table_arn
   usage_quota_table_name = module.storage.usage_quota_table_name
   usage_quota_table_arn  = module.storage.usage_quota_table_arn
+  users_table_name       = module.storage.users_table_name
+  users_table_arn        = module.storage.users_table_arn
   artifacts_bucket_name  = module.storage.artifacts_bucket_name
   artifacts_bucket_arn   = module.storage.artifacts_bucket_arn
   kms_key_arn            = module.storage.kms_key_arn
   daily_job_quota        = var.daily_job_quota_per_user
   state_machine_arn      = module.state_machine.state_machine_arn
+  app_url                = "https://dev.rosetta-translate.com"
+  ssm_prefix             = "/rosetta/dev"
 }
 
 module "api" {

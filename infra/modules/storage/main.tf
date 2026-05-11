@@ -106,6 +106,47 @@ resource "aws_dynamodb_table" "usage_quota" {
 }
 
 # ---------------------------------------------------------------------------
+# DynamoDB: Users
+# Stores user profile, tier, quota limit, and Stripe metadata.
+# GSI on stripeCustomerId for webhook processing.
+# ---------------------------------------------------------------------------
+
+resource "aws_dynamodb_table" "users" {
+  name         = "${var.name_prefix}-users"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "userId"
+
+  attribute {
+    name = "userId"
+    type = "S"
+  }
+
+  # GSI to look up users by Stripe customer ID (for webhook processing)
+  attribute {
+    name = "stripeCustomerId"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name = "stripeCustomerId-index"
+    key_schema {
+      attribute_name = "stripeCustomerId"
+      key_type       = "HASH"
+    }
+    projection_type = "ALL"
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.this.arn
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+}
+
+# ---------------------------------------------------------------------------
 # S3: artifacts bucket (inputs/, staging/, outputs/)
 # ---------------------------------------------------------------------------
 

@@ -15,13 +15,14 @@ Returns:
   symbolTable  — project-wide identifiers
   planNotes    — LLM reasoning about the translation approach
 """
-import json
 import os
 
 import boto3
 from botocore.config import Config
 
 from ddb_utils import update_job_step
+from bedrock_utils import bedrock_tool_call
+from toon_utils import toon_file_inventory, toon_table
 
 ddb     = boto3.resource("dynamodb")
 bedrock = boto3.client("bedrock-runtime", region_name=os.environ.get("AWS_REGION", "us-east-1"))
@@ -109,20 +110,21 @@ def handler(event, context):
     if source_lang == "cdk" and cdk_lang:
         src_label = f"AWS CDK ({cdk_lang})"
 
-    # ── Build project overview for the prompt ─────────────────────────────────
-    tree_lines = []
-    for directory, files in sorted(directory_tree.items()):
-        tree_lines.append(f"  {directory}/")
-        for f in sorted(files):
-            size = next((x["size"] for x in file_list if x["path"] == f"{directory}/{f}" or
-                         (directory == "." and x["path"] == f)), 0)
-            tree_lines.append(f"    {f} ({size:,} bytes)")
+    # ── Build project overview for the prompt (TOON for tabular data) ──────────
 
-    preserved_lines = []
-    for pf in preserved_files:
-        preserved_lines.append(f"  {pf['path']} ({pf['size']:,} bytes) [PRESERVED - copy unchanged]")
+    # File inventory as TOON tabular array — ~40-50% fewer tokens than JSON/text
+    file_inventory_toon = toon_file_inventory(file_list, directory_tree)
 
-    # Include content summaries for key files (cap to avoid huge prompts)
+    # Preserved assets as TOON table (flat and uniform)
+    preserved_toon = "(none)"
+    if preserved_files:
+        preserved_toon = toon_table(
+            "preserved_assets",
+            [{"path": p["path"], "size": p["size"]} for p in preserved_files],
+            ["path", "size"],
+        )
+
+    # File content previews — keep as plain text (code content, not tabular)
     summary_lines = []
     shown = 0
     for rel_path, summary in file_summaries.items():
@@ -137,42 +139,73 @@ def handler(event, context):
     user_msg = f"""\
 Translate this project from {src_label} to {tgt_label}.
 
-## Project structure
-```
-{chr(10).join(tree_lines) or "  (empty)"}
-```
+## IaC file inventory (TOON format — path, directory, size in bytes)
+{file_inventory_toon}
 
-## Non-IaC assets (preserved unchanged)
-{chr(10).join(preserved_lines) or "  none"}
+## Non-IaC assets (preserved unchanged, TOON format)
+{preserved_toon}
 
 ## File content previews (first 200 chars each)
 {chr(10).join(summary_lines) or "  none"}
 
-## Total files: {len(file_list)} IaC files, {len(preserved_files)} preserved assets
+## Total: {len(file_list)} IaC files, {len(preserved_files)} preserved assets
 
 Produce the translation plan JSON following this exact schema:
 {UNIT_SCHEMA}"""
 
-    response = bedrock.converse(
+    output_file_schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "role": {"type": "string", "enum": ["resources", "variables", "outputs", "providers", "backend", "root_template", "nested_template", "stack_class", "construct_class"]},
+        },
+        "required": ["name", "role"],
+    }
+    unit_schema = {
+        "type": "object",
+        "properties": {
+            "unitId":          {"type": "string"},
+            "description":     {"type": "string"},
+            "sourceDirectory": {"type": "string"},
+            "sourceFiles":     {"type": "array", "items": {"type": "string"}},
+            "outputDirectory": {"type": "string"},
+            "outputFiles":     {"type": "array", "items": output_file_schema},
+            "strategy":        {"type": "string", "enum": ["single_template", "nested_stack", "tf_root_module", "tf_module", "cdk_stack", "cdk_construct"]},
+            "lambdaZipRefs":   {"type": "array", "items": {"type": "string"}},
+            "dependsOn":       {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["unitId", "sourceDirectory", "sourceFiles", "outputDirectory", "outputFiles", "strategy"],
+    }
+    plan_schema = {
+        "type": "object",
+        "properties": {
+            "units": {"type": "array", "items": unit_schema, "minItems": 1},
+            "symbolTable": {
+                "type": "object",
+                "properties": {
+                    "variables": {"type": "object"},
+                    "resources":  {"type": "object"},
+                    "outputs":    {"type": "object"},
+                    "modules":    {"type": "object"},
+                },
+            },
+            "planNotes": {"type": "string"},
+        },
+        "required": ["units", "symbolTable", "planNotes"],
+    }
+
+    response, plan = bedrock_tool_call(
+        bedrock,
+        tool_name="submit_translation_plan",
+        tool_description="Submit the structured translation plan for this IaC project.",
+        output_schema=plan_schema,
         modelId=TRANSLATE_MODEL,
         system=[{"text": SYSTEM_PROMPT}],
         messages=[{"role": "user", "content": [{"text": user_msg}]}],
-        inferenceConfig={"maxTokens": 4096},
+        inferenceConfig={"maxTokens": 8192},
     )
 
-    raw = response["output"]["message"]["content"][0]["text"].strip()
-
-    # Strip markdown code fences if present
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-
-    try:
-        plan = json.loads(raw)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"PlanTranslation returned invalid JSON: {e}\n\nRaw:\n{raw[:500]}")
-
-    # Validate minimal structure
-    if "units" not in plan or not plan["units"]:
+    if not plan.get("units"):
         raise ValueError("PlanTranslation returned empty units list")
 
     return {

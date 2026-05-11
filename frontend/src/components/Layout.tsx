@@ -1,8 +1,8 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Plus, LogOut, Zap, ArrowRight, Clock } from 'lucide-react'
+import { LayoutDashboard, Plus, LogOut, Zap, ArrowRight, Settings } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { signOut } from '../lib/auth'
-import { listJobs, type Job } from '../lib/api'
+import { listJobs, getUserProfile, createCheckoutSession, type Job } from '../lib/api'
 import ThemeToggle from './ThemeToggle'
 import HieroglyphRain from './HieroglyphRain'
 import Footer from './Footer'
@@ -91,7 +91,17 @@ function RecentJobs({ jobs, navigate }: { jobs: Job[]; navigate: (p: string) => 
   )
 }
 
-function QuotaCard({ jobs, loading }: { jobs: Job[]; loading: boolean }) {
+function QuotaCard({
+  jobs,
+  loading,
+  tier,
+  quotaLimit,
+}: {
+  jobs: Job[]
+  loading: boolean
+  tier?: 'free' | 'pro'
+  quotaLimit?: number
+}) {
   const today = new Date().toDateString()
   // Only count jobs that actually ran — FAILED jobs are refunded by mark_failed,
   // AWAITING_UPLOAD jobs haven't started yet.
@@ -100,8 +110,28 @@ function QuotaCard({ jobs, loading }: { jobs: Job[]; loading: boolean }) {
     j.status !== 'AWAITING_UPLOAD' &&
     j.status !== 'FAILED'
   ).length
-  const remaining = Math.max(0, DAILY_QUOTA - usedToday)
-  const pct = ((DAILY_QUOTA - remaining) / DAILY_QUOTA) * 100
+  const limit = quotaLimit ?? DAILY_QUOTA
+  const remaining = Math.max(0, limit - usedToday)
+  const pct = ((limit - remaining) / limit) * 100
+
+  if (tier === 'pro') {
+    return (
+      <div className="rounded-xl p-3" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-medium flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+            <Zap size={11} style={{ color: 'var(--accent)' }} />
+            Monthly usage
+          </span>
+          <span className="font-mono text-xs font-bold" style={{ color: 'var(--accent)' }}>
+            Pro · {limit}/mo
+          </span>
+        </div>
+        <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
+          Unlimited daily — {limit} translations/month
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-xl p-3" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}>
@@ -111,7 +141,7 @@ function QuotaCard({ jobs, loading }: { jobs: Job[]; loading: boolean }) {
           Daily usage
         </span>
         <span className="font-mono text-xs font-bold" style={{ color: remaining === 0 ? '#DC2626' : 'var(--accent)' }}>
-          {loading ? '…' : `${usedToday}/${DAILY_QUOTA}`}
+          {loading ? '…' : `${usedToday}/${limit}`}
         </span>
       </div>
       {/* Progress bar */}
@@ -128,6 +158,45 @@ function QuotaCard({ jobs, loading }: { jobs: Job[]; loading: boolean }) {
         {remaining === 0 ? 'Daily limit reached — resets at midnight UTC' : `${remaining} remaining today`}
       </p>
     </div>
+  )
+}
+
+function UpgradeCTA() {
+  const navigate = useNavigate()
+
+  async function handleUpgrade() {
+    try {
+      const { url } = await createCheckoutSession()
+      window.location.href = url
+    } catch {
+      navigate('/settings')
+    }
+  }
+
+  return (
+    <button
+      onClick={handleUpgrade}
+      className="w-full rounded-xl p-3 text-left transition-all duration-150"
+      style={{
+        background: 'var(--accent-subtle)',
+        border: '1px solid var(--accent)',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+      onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
+          ✦ Upgrade to Pro
+        </span>
+        <span className="text-xs font-bold" style={{ color: 'var(--accent)' }}>→</span>
+      </div>
+      <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        100 translations · API access · Full history
+      </p>
+      <p className="text-[10px] font-semibold mt-1" style={{ color: 'var(--accent)' }}>
+        $18/month
+      </p>
+    </button>
   )
 }
 
@@ -164,10 +233,18 @@ export default function Layout() {
   })
   const jobs = jobsData?.items ?? []
 
+  const { data: profile } = useQuery({
+    queryKey:          ['user-profile'],
+    queryFn:           getUserProfile,
+    refetchOnWindowFocus: false,
+  })
+
   async function handleSignOut() {
     await signOut()
     navigate('/login', { replace: true })
   }
+
+  const isPro = profile?.tier === 'pro'
 
   return (
     <div className="min-h-screen flex" style={{ background: "transparent" }}>
@@ -182,9 +259,19 @@ export default function Layout() {
         <div className="px-4 py-4 border-b flex-shrink-0 flex items-center gap-3" style={{ borderColor: 'var(--border)' }}>
           <img src="/rosetta-logo.png" alt="Rosetta" className="w-9 h-9 flex-shrink-0"  />
           <div>
-            <span className="font-display text-base font-bold tracking-tight block" style={{ color: 'var(--accent)' }}>
-              ROSETTA
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-display text-base font-bold tracking-tight block" style={{ color: 'var(--accent)' }}>
+                ROSETTA
+              </span>
+              {isPro && (
+                <span
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                  style={{ background: 'var(--accent)', color: 'var(--bg)', lineHeight: 1 }}
+                >
+                  PRO
+                </span>
+              )}
+            </div>
             <p className="text-[10px] font-mono leading-none mt-0.5" style={{ color: 'var(--text-faint)' }}>
               IaC Translator
             </p>
@@ -217,12 +304,32 @@ export default function Layout() {
 
         {/* Middle — fills remaining space, cards pushed to bottom */}
         <div className="flex-1 p-3 flex flex-col justify-end gap-2.5">
-          <QuotaCard jobs={jobs} loading={jobsLoading} />
+          <QuotaCard
+            jobs={jobs}
+            loading={jobsLoading}
+            tier={profile?.tier}
+            quotaLimit={profile?.quotaLimit}
+          />
+          {!isPro && <UpgradeCTA />}
           <FormatsCard />
         </div>
 
         {/* Footer — always at the very bottom */}
         <div className="p-3 border-t flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              `w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm mb-1
+               transition-all duration-150 ${
+                isActive
+                  ? 'text-[var(--accent)] bg-[var(--accent-subtle)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-subtle)]'
+              }`
+            }
+          >
+            <Settings size={14} />
+            Settings
+          </NavLink>
           <div className="flex items-center justify-between">
             <button
               onClick={handleSignOut}

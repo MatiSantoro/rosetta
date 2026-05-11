@@ -19,8 +19,8 @@ output "user_pool_client_id" {
 }
 
 output "hosted_ui_domain" {
-  description = "Cognito-managed Hosted UI domain (no protocol)."
-  value       = "${aws_cognito_user_pool_domain.this.domain}.auth.${data.aws_region.current.region}.amazoncognito.com"
+  description = "Hosted UI domain (no protocol). Custom domain when configured, otherwise Cognito-managed."
+  value       = var.custom_domain != "" ? "auth.${var.custom_domain}" : "${aws_cognito_user_pool_domain.this.domain}.auth.${data.aws_region.current.region}.amazoncognito.com"
 }
 
 output "issuer" {
