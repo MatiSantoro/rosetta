@@ -113,6 +113,7 @@ def get_user(ddb, table_name: str, user_id: str) -> dict:
         "apiKey":             None,
         "stripeCustomerId":   None,
         "subscriptionStatus": None,
+        "isAdmin":            False,
     })
 
 

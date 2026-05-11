@@ -50,6 +50,7 @@ export interface UserProfile {
   quotaLimit: number
   subscriptionStatus: string | null
   apiKey: string | null
+  isAdmin: boolean
 }
 
 // ── Fetch wrapper ───────────────────────────────────────────────────────────

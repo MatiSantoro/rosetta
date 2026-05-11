@@ -29,4 +29,5 @@ def handler(event, context):
         "quotaLimit":         int(user.get("quotaLimit", 5)),
         "subscriptionStatus": user.get("subscriptionStatus"),
         "apiKey":             api_key if user.get("tier") == "pro" else None,
+        "isAdmin":            bool(user.get("isAdmin", False)),
     })

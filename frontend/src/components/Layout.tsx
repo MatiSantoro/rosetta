@@ -102,17 +102,17 @@ function QuotaCard({
   tier?: 'free' | 'pro'
   quotaLimit?: number
 }) {
-  const today = new Date().toDateString()
-  // Only count jobs that actually ran — FAILED jobs are refunded by mark_failed,
-  // AWAITING_UPLOAD jobs haven't started yet.
-  const usedToday = jobs.filter(j =>
-    new Date(j.createdAt).toDateString() === today &&
-    j.status !== 'AWAITING_UPLOAD' &&
-    j.status !== 'FAILED'
-  ).length
+  // Count jobs used this month — backend tracks monthly quota (YYYY-MM key)
+  const thisMonth = new Date().toISOString().slice(0, 7) // "2026-05"
+  const usedThisMonth = jobs.filter(j => {
+    const jobMonth = j.createdAt?.slice(0, 7)
+    return jobMonth === thisMonth &&
+      j.status !== 'AWAITING_UPLOAD' &&
+      j.status !== 'FAILED'
+  }).length
   const limit = quotaLimit ?? DAILY_QUOTA
-  const remaining = Math.max(0, limit - usedToday)
-  const pct = ((limit - remaining) / limit) * 100
+  const remaining = Math.max(0, limit - usedThisMonth)
+  const pct = Math.min(100, (usedThisMonth / limit) * 100)
 
   if (tier === 'pro') {
     return (
@@ -123,11 +123,17 @@ function QuotaCard({
             Monthly usage
           </span>
           <span className="font-mono text-xs font-bold" style={{ color: 'var(--accent)' }}>
-            Pro · {limit}/mo
+            {loading ? '…' : `${usedThisMonth}/${limit}`}
           </span>
         </div>
+        <div className="h-1 rounded-full overflow-hidden mb-1.5" style={{ background: 'var(--border)' }}>
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${pct}%`, background: 'var(--accent)' }}
+          />
+        </div>
         <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
-          Unlimited daily — {limit} translations/month
+          {remaining} translations remaining this month
         </p>
       </div>
     )
@@ -138,13 +144,12 @@ function QuotaCard({
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-medium flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
           <Zap size={11} style={{ color: 'var(--accent)' }} />
-          Daily usage
+          Monthly usage
         </span>
         <span className="font-mono text-xs font-bold" style={{ color: remaining === 0 ? '#DC2626' : 'var(--accent)' }}>
-          {loading ? '…' : `${usedToday}/${limit}`}
+          {loading ? '…' : `${usedThisMonth}/${limit}`}
         </span>
       </div>
-      {/* Progress bar */}
       <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
         <div
           className="h-full rounded-full transition-all duration-500"
@@ -155,7 +160,7 @@ function QuotaCard({
         />
       </div>
       <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-faint)' }}>
-        {remaining === 0 ? 'Daily limit reached — resets at midnight UTC' : `${remaining} remaining today`}
+        {remaining === 0 ? 'Monthly limit reached — resets next month' : `${remaining} remaining this month`}
       </p>
     </div>
   )
@@ -252,7 +257,7 @@ export default function Layout() {
 
       {/* Sidebar — fixed height, no scroll */}
       <aside
-        className="hidden md:flex flex-col w-56 flex-shrink-0 border-r overflow-hidden"
+        className="hidden md:flex flex-col w-56 flex-shrink-0 border-r"
         style={{ background: 'var(--surface)', borderColor: 'var(--border)', height: '100vh', position: 'sticky', top: 0 }}
       >
         {/* Brand */}
