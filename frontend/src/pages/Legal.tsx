@@ -12,7 +12,7 @@ export default function Legal() {
 
         {/* Back */}
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/')}
           className="flex items-center gap-2 text-sm mb-8 transition-colors"
           style={{ color: 'var(--text-muted)' }}
           onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}

@@ -25,8 +25,9 @@ def handler(event, context):
     params     = event.get("queryStringParameters") or {}
     next_token = params.get("nextToken")
 
-    user = get_user(ddb, USERS_TABLE, user_id)
-    tier = user.get("tier", "free")
+    user     = get_user(ddb, USERS_TABLE, user_id)
+    is_admin = bool(user.get("isAdmin", False))
+    tier     = "pro" if (is_admin or user.get("tier") == "pro") else "free"
 
     kwargs = {
         "KeyConditionExpression": Key("userId").eq(user_id),

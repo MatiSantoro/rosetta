@@ -48,8 +48,9 @@ def handler(event, context):
     if target_lang == "cdk" and target_cdk_lang not in VALID_CDK_LANGS:
         return err(400, f"targetCdkLang required for CDK. Must be one of: {', '.join(VALID_CDK_LANGS)}")
 
-    user = get_user(ddb, USERS_TABLE, user_id)
-    quota_limit = int(user.get("quotaLimit", FREE_JOB_QUOTA))
+    user        = get_user(ddb, USERS_TABLE, user_id)
+    is_admin    = bool(user.get("isAdmin", False))
+    quota_limit = 9999 if is_admin else int(user.get("quotaLimit", FREE_JOB_QUOTA))
     month = datetime.now(timezone.utc).strftime("%Y-%m")
     if not check_and_increment_quota(ddb, QUOTA_TABLE, user_id, month, quota_limit):
         return err(429, f"Monthly job quota of {quota_limit} reached. Upgrade to Pro for more translations.")

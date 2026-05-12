@@ -126,7 +126,7 @@ function EmptyState() {
       {/* Icon */}
       <div
         className="w-20 h-20 rounded-3xl flex items-center justify-center mb-6"
-        style={{ background: 'var(--accent-subtle)', border: '1px solid var(--accent)', boxShadow: '0 0 40px var(--accent-glow)' }}
+        style={{ background: 'var(--accent-subtle)' }}
       >
         <FileCode size={36} style={{ color: 'var(--accent)' }} />
       </div>
@@ -139,7 +139,7 @@ function EmptyState() {
         translated version back in minutes.
       </p>
 
-      <button onClick={() => navigate('/jobs/new')} className="btn btn-primary px-6 py-2.5 mb-12"
+      <button onClick={() => navigate('/jobs/new')} className="btn btn-primary px-6 py-2.5"
               style={{ boxShadow: '0 4px 16px var(--accent-glow)' }}>
         <Plus size={15} />
         Start your first translation
@@ -147,27 +147,22 @@ function EmptyState() {
 
       {/* How it works */}
       <div
-        className="grid gap-4 w-full max-w-lg"
+        className="grid gap-3 w-full max-w-lg mt-16"
         style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}
       >
         {[
-          { icon: Upload, title: 'Upload',    desc: 'Zip your IaC files and upload' },
-          { icon: Cpu,    title: 'Translate', desc: 'Claude AI converts between formats' },
-          { icon: Download, title: 'Download', desc: 'Get clean, validated output' },
-        ].map(({ icon: Icon, title, desc }, i) => (
+          { icon: Upload,   label: '01', title: 'Upload',    desc: 'Zip your IaC files and upload' },
+          { icon: Cpu,      label: '02', title: 'Translate', desc: 'Claude AI converts between formats' },
+          { icon: Download, label: '03', title: 'Download',  desc: 'Get clean, validated output' },
+        ].map(({ icon: Icon, label, title, desc }) => (
           <div
             key={title}
             className="flex flex-col items-center gap-2 p-4 rounded-2xl text-center"
             style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}
           >
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center mb-1"
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-            >
-              <span className="text-[10px] font-bold font-mono" style={{ color: 'var(--text-faint)' }}>
-                0{i + 1}
-              </span>
-            </div>
+            <span className="text-[10px] font-bold font-mono mb-1" style={{ color: 'var(--text-faint)' }}>
+              {label}
+            </span>
             <Icon size={18} style={{ color: 'var(--accent)' }} />
             <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{title}</p>
             <p className="text-[11px] leading-snug" style={{ color: 'var(--text-faint)' }}>{desc}</p>
@@ -332,6 +327,33 @@ export default function Dashboard() {
             New
           </button>
         </div>
+      </div>
+
+      {/* Mobile-only quota + upgrade strip — sidebar is hidden on small screens */}
+      <div className="md:hidden mb-4 space-y-2">
+        {/* Quota bar */}
+        <div className="rounded-xl px-4 py-3 flex items-center justify-between"
+             style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}>
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Monthly usage
+          </span>
+          <span className="text-xs font-mono font-bold" style={{ color: profile?.tier === 'pro' ? 'var(--accent)' : 'var(--text)' }}>
+            {profile?.tier === 'pro' ? `Pro · ${profile.quotaLimit}/mo` : `${profile?.quotaLimit ?? 5}/mo free`}
+          </span>
+        </div>
+        {/* Upgrade CTA — only for free users */}
+        {profile?.tier !== 'pro' && (
+          <button
+            onClick={() => navigate('/settings')}
+            className="w-full rounded-xl px-4 py-2.5 text-left flex items-center justify-between"
+            style={{ background: 'var(--accent-subtle)', border: '1px solid var(--accent)' }}
+          >
+            <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
+              ✦ Upgrade to Pro — $18/month
+            </span>
+            <span style={{ color: 'var(--accent)' }}>→</span>
+          </button>
+        )}
       </div>
 
       {/* Content */}

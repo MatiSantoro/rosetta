@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Check, Copy, ExternalLink, AlertTriangle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Check, Copy, ExternalLink, AlertTriangle, LogOut } from 'lucide-react'
 import { getUserProfile, createCheckoutSession, createPortalSession } from '../lib/api'
+import { signOut } from '../lib/auth'
 
 // ── Subscription section ────────────────────────────────────────────────────
 
@@ -273,6 +275,15 @@ function ApiKeySection() {
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export default function Settings() {
+  const navigate  = useNavigate()
+  const [loading, setLoading] = useState(false)
+
+  async function handleSignOut() {
+    setLoading(true)
+    await signOut()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <div className="animate-fade-in">
       <h1 className="text-2xl font-bold mb-6" style={{ color: 'var(--text)' }}>
@@ -282,6 +293,29 @@ export default function Settings() {
       <div className="space-y-4">
         <SubscriptionSection />
         <ApiKeySection />
+
+        {/* Sign out — always visible, especially useful on mobile where the sidebar is hidden */}
+        <div className="card p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-widest mb-4"
+              style={{ color: 'var(--text-faint)' }}>
+            Account
+          </h2>
+          <button
+            onClick={handleSignOut}
+            disabled={loading}
+            className="flex items-center gap-2 text-sm transition-colors"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#DC2626')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+          >
+            {loading
+              ? <div className="w-4 h-4 rounded-full border-2 border-current border-t-transparent"
+                     style={{ animation: 'spin 0.7s linear infinite' }} />
+              : <LogOut size={14} />
+            }
+            Sign out
+          </button>
+        </div>
       </div>
     </div>
   )

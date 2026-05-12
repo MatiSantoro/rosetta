@@ -379,7 +379,7 @@ export default function Layout() {
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t flex"
            style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-        {navItems.map(({ to, icon: Icon, label }) => (
+        {[...navItems, { to: '/settings', icon: Settings, label: 'Settings' }].map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
