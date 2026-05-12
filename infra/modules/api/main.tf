@@ -8,7 +8,8 @@ locals {
     "GET /jobs"               = "list_jobs"
     "POST /billing/checkout"  = "billing"
     "POST /billing/portal"    = "billing"
-    "GET /user/profile"       = "get_user"
+    "GET /user/profile"            = "get_user"
+    "POST /jobs/{id}/feedback"     = "submit_feedback"
   }
 }
 

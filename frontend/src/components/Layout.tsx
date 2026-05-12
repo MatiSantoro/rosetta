@@ -370,7 +370,7 @@ export default function Layout() {
 
       {/* Main content */}
       <main className="flex-1 min-w-0 md:pt-0 pt-14">
-        <div className="max-w-4xl mx-auto px-4 md:px-8 py-8 animate-fade-in">
+        <div className="max-w-4xl mx-auto px-4 md:px-8 py-8 md:pb-8 pb-24 animate-fade-in">
           <Outlet />
         <Footer minimal />
         </div>

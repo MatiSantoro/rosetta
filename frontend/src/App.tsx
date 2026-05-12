@@ -10,6 +10,7 @@ import AuthCallback from './pages/AuthCallback'
 import Legal from './pages/Legal'
 import Settings from './pages/Settings'
 import BillingSuccess from './pages/BillingSuccess'
+import NotFound from './pages/NotFound'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const [checked, setChecked]   = useState(false)
@@ -52,11 +53,12 @@ export default function App() {
         <Route path="/jobs/new" element={<NewJob />} />
         <Route path="/jobs/:id" element={<JobDetail />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="*"         element={<NotFound />} />
       </Route>
 
       <Route path="/billing/success" element={<RequireAuth><BillingSuccess /></RequireAuth>} />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   )
 }

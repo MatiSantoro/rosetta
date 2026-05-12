@@ -1,5 +1,5 @@
 locals {
-  handler_names = toset(["create_job", "start_job", "get_job", "list_jobs", "get_download", "billing", "get_user"])
+  handler_names = toset(["create_job", "start_job", "get_job", "list_jobs", "get_download", "billing", "get_user", "submit_feedback"])
 
   common_env = {
     JOBS_TABLE        = var.jobs_table_name

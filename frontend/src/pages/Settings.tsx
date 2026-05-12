@@ -217,7 +217,7 @@ function ApiKeySection() {
 
       {apiKey ? (
         <>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             <input
               readOnly
               value={apiKey}

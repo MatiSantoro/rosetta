@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Plus, ArrowRight, Clock, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react'
+import { Plus, ArrowRight, Clock, ChevronLeft, ChevronRight, ArrowUpDown, FileCode, Upload, Cpu, Download } from 'lucide-react'
 import { listJobs, getUserProfile, type Job, type LangKey } from '../lib/api'
 import StatusBadge from '../components/StatusBadge'
 
@@ -78,12 +78,12 @@ function JobCard({ job }: { job: Job }) {
   const navigate = useNavigate()
   return (
     <div
-      className="card p-4 cursor-pointer hover:border-[var(--accent)] transition-all duration-200 group"
+      className="card p-4 cursor-pointer hover:border-[var(--accent)] transition-all duration-200 group overflow-hidden"
       onClick={() => navigate(`/jobs/${job.jobId}`)}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span className="font-mono text-xs px-2 py-0.5 rounded"
                   style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)' }}>
               {formatLang(job, 'source')}
@@ -94,7 +94,7 @@ function JobCard({ job }: { job: Job }) {
               {formatLang(job, 'target')}
             </span>
           </div>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 min-w-0">
               <StatusBadge status={job.status} />
               {(job.tokensIn + job.tokensOut) > 0 && (
@@ -122,21 +122,58 @@ function JobCard({ job }: { job: Job }) {
 function EmptyState() {
   const navigate = useNavigate()
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
-           style={{ background: 'var(--accent-subtle)', border: '1px solid var(--accent)' }}>
-        <Plus size={28} style={{ color: 'var(--accent)' }} />
+    <div className="flex flex-col items-center py-16 text-center animate-fade-in">
+      {/* Icon */}
+      <div
+        className="w-20 h-20 rounded-3xl flex items-center justify-center mb-6"
+        style={{ background: 'var(--accent-subtle)', border: '1px solid var(--accent)', boxShadow: '0 0 40px var(--accent-glow)' }}
+      >
+        <FileCode size={36} style={{ color: 'var(--accent)' }} />
       </div>
-      <h2 className="font-display text-xl font-semibold mb-2" style={{ color: 'var(--text)' }}>
-        No translations yet
+
+      <h2 className="font-display text-2xl font-bold mb-3" style={{ color: 'var(--text)' }}>
+        Your first translation is one upload away.
       </h2>
-      <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
-        Upload your IaC project and convert it to any supported format.
+      <p className="text-sm mb-8 max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        Upload a zip of any IaC project — Terraform, CloudFormation, SAM, or CDK — and get a
+        translated version back in minutes.
       </p>
-      <button onClick={() => navigate('/jobs/new')} className="btn btn-primary">
+
+      <button onClick={() => navigate('/jobs/new')} className="btn btn-primary px-6 py-2.5 mb-12"
+              style={{ boxShadow: '0 4px 16px var(--accent-glow)' }}>
         <Plus size={15} />
-        Start first translation
+        Start your first translation
       </button>
+
+      {/* How it works */}
+      <div
+        className="grid gap-4 w-full max-w-lg"
+        style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}
+      >
+        {[
+          { icon: Upload, title: 'Upload',    desc: 'Zip your IaC files and upload' },
+          { icon: Cpu,    title: 'Translate', desc: 'Claude AI converts between formats' },
+          { icon: Download, title: 'Download', desc: 'Get clean, validated output' },
+        ].map(({ icon: Icon, title, desc }, i) => (
+          <div
+            key={title}
+            className="flex flex-col items-center gap-2 p-4 rounded-2xl text-center"
+            style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}
+          >
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center mb-1"
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+            >
+              <span className="text-[10px] font-bold font-mono" style={{ color: 'var(--text-faint)' }}>
+                0{i + 1}
+              </span>
+            </div>
+            <Icon size={18} style={{ color: 'var(--accent)' }} />
+            <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{title}</p>
+            <p className="text-[11px] leading-snug" style={{ color: 'var(--text-faint)' }}>{desc}</p>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

@@ -186,6 +186,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts" {
 resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
   bucket = aws_s3_bucket.artifacts.id
 
+  # inputs and staging — short-lived scratch space for all users (default 7 days)
   rule {
     id     = "expire-inputs"
     status = "Enabled"
@@ -202,11 +203,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
     abort_incomplete_multipart_upload { days_after_initiation = 1 }
   }
 
+  # outputs — kept longer so Pro users can re-download from job history;
+  # free users also benefit from the extended window (30 days)
   rule {
     id     = "expire-outputs"
     status = "Enabled"
     filter { prefix = "outputs/" }
-    expiration { days = var.artifacts_retention_days }
+    expiration { days = 30 }
     abort_incomplete_multipart_upload { days_after_initiation = 1 }
   }
 }

@@ -37,6 +37,7 @@ export interface Job {
     errors: Array<{ file: string; msg: string; rule?: string }>
     warnings: string[]
   }
+  feedback?: 'up' | 'down'
 }
 
 export interface CreateJobResponse {
@@ -125,6 +126,16 @@ export async function createCheckoutSession(): Promise<{ url: string }> {
 
 export async function createPortalSession(): Promise<{ url: string }> {
   return apiFetch('/billing/portal', { method: 'POST' })
+}
+
+export async function submitFeedback(
+  jobId: string,
+  feedback: 'up' | 'down',
+): Promise<void> {
+  return apiFetch(`/jobs/${jobId}/feedback`, {
+    method: 'POST',
+    body: JSON.stringify({ feedback }),
+  })
 }
 
 // ── Full job submission flow ────────────────────────────────────────────────

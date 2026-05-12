@@ -51,6 +51,10 @@ export default function Footer({ minimal = false }: FooterProps) {
              className="flex items-center gap-1 hover:text-[var(--accent)] transition-colors">
             <Coffee size={11} /> Support
           </a>
+          <a href="/legal"
+             className="hover:text-[var(--accent)] transition-colors">
+            Terms &amp; Privacy
+          </a>
         </div>
       </footer>
     )

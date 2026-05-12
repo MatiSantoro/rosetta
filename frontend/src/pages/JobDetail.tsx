@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Download, AlertCircle, CheckCircle, ArrowRight, Copy, Check, Lock } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
-import { getJob, getDownloadUrl, type Job, type LangKey } from '../lib/api'
+import { getJob, getDownloadUrl, submitFeedback, type Job, type LangKey } from '../lib/api'
 import StatusBadge from '../components/StatusBadge'
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -342,6 +342,64 @@ function LockedValidation() {
   )
 }
 
+// ── Feedback widget ─────────────────────────────────────────────────────────
+
+function FeedbackWidget({ job }: { job: Job }) {
+  const [submitted, setSubmitted] = useState<'up' | 'down' | null>(
+    job.feedback ?? null
+  )
+  const [loading, setLoading] = useState(false)
+
+  async function vote(value: 'up' | 'down') {
+    if (submitted || loading) return
+    setLoading(true)
+    try {
+      await submitFeedback(job.jobId, value)
+      setSubmitted(value)
+    } catch {
+      // silently ignore — feedback is non-critical
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (submitted) {
+    return (
+      <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
+        {submitted === 'up' ? '👍' : '👎'} Thanks for your feedback!
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
+        Was this translation accurate?
+      </p>
+      <div className="flex items-center gap-2">
+        {(['up', 'down'] as const).map(v => (
+          <button
+            key={v}
+            onClick={() => vote(v)}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-150"
+            style={{
+              background: 'var(--bg-subtle)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-muted)',
+              opacity: loading ? 0.5 : 1,
+            }}
+            onMouseEnter={e => { if (!loading) e.currentTarget.style.borderColor = 'var(--accent)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+          >
+            {v === 'up' ? '👍' : '👎'}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ──────────────────────────────────────────────────────────
 
 export default function JobDetail() {
@@ -400,7 +458,7 @@ export default function JobDetail() {
       </div>
 
       {/* Route summary */}
-      <div className="card p-4 flex items-center gap-3 mb-4">
+      <div className="card p-4 mb-4 flex flex-wrap items-center gap-3">
         <span className="font-mono text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
           {srcLabel}
         </span>
@@ -409,7 +467,7 @@ export default function JobDetail() {
           {tgtLabel}
         </span>
         {totalTokens > 0 && (
-          <span className="ml-auto text-xs font-mono" style={{ color: 'var(--text-faint)' }}>
+          <span className="text-xs font-mono" style={{ color: 'var(--text-faint)', marginLeft: 'auto' }}>
             {(totalTokens / 1000).toFixed(1)}k tokens
           </span>
         )}
@@ -484,6 +542,7 @@ export default function JobDetail() {
             Your translated IaC is ready.
           </p>
           <DownloadButton jobId={job.jobId} />
+          <FeedbackWidget job={job} />
           <button onClick={() => navigate('/jobs/new')} className="btn btn-ghost text-xs">
             Start another translation
           </button>
